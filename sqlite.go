@@ -14,6 +14,12 @@ import (
 )
 
 var (
+	// db is the connection point for making SQL calls to our sqlite database.
+	// You use it like any other database/sql driver. Part of shutdown is to close
+	// out the file/session.
+	//
+	// https://github.com/mattn/go-sqlite3/blob/master/_example/simple/simple.go
+	// https://astaxie.gitbooks.io/build-web-application-with-golang/en/05.3.html
 	db         *sql.DB
 	sqlitePath string
 
