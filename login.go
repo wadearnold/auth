@@ -56,7 +56,7 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		}
 
 		// find user by userId and password
-		if err := auth.check(u.ID, login.Password); err != nil {
+		if err := auth.checkPassword(u.ID, login.Password); err != nil {
 			authFailures.With("method", "web").Add(1)
 			w.WriteHeader(http.StatusForbidden)
 			return

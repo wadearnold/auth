@@ -100,7 +100,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 
 			// TODO(adam): check password requirements ?
 
-			if err := auth.write(u.ID, signup.Password); err != nil {
+			if err := auth.writePassword(u.ID, signup.Password); err != nil {
 				encodeError(w, errors.New("problem writing user credentials"))
 				internalError(w, fmt.Errorf("problem writing user credentials: %v", err), "signup")
 				return

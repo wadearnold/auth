@@ -74,7 +74,7 @@ type userRepository interface {
 	lookupById(id string) (*User, error)
 
 	// lookupByEmail finds a user by the given email address.
-	// It's recommended you provide User.CleanEmail()
+	// It's recommended you provide User.cleanEmail()
 	lookupByEmail(email string) (*User, error)
 
 	upsert(*User) error
@@ -83,13 +83,58 @@ type userRepository interface {
 type sqliteUserRepository struct{}
 
 func (s *sqliteUserRepository) lookupById(id string) (*User, error) {
+	// users and user_details
 	return nil, nil
 }
 
 func (s *sqliteUserRepository) lookupByEmail(email string) (*User, error) {
-	return nil, nil
+	// users
+	var u *User
+	return s.lookupById(u.ID)
 }
 
 func (s *sqliteUserRepository) upsert(inc *User) error {
+	// users and user_details
+	return nil
+}
+
+// authable represents the interactions of a user's authentication
+// status. This boils down to password comparison and cookie data.
+type authable interface {
+	checkCookies(userId string, incoming []string) error
+	invalidateCookies(userId string) error
+	writeCookies(userId string, incoming []string) error
+
+	// checkPassword compares the provided password for the user.
+	// a non-nil error is returned if the passwords don't match
+	// or that the userId doesn't exist.
+	checkPassword(userId string, pass string) error
+	writePassword(userId string, pass string) error
+}
+
+type auth struct{}
+
+func (a *auth) checkCookies(userId string, cookies []string) error {
+	// user_cookies
+	return nil
+}
+
+func (a *auth) invalidateCookies(userId string) error {
+	// user_cookies
+	return nil
+}
+
+func (a *auth) writeCookies(userId string, incoming []string) error {
+	// user_cookies
+	return nil
+}
+
+func (a *auth) checkPassword(userId string, pass string) error {
+	// user_passwords
+	return nil
+}
+
+func (a *auth) writePassword(userId string, pass string) error {
+	// user_passwords
 	return nil
 }
