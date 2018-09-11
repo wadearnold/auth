@@ -33,8 +33,7 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		}
 		bs, err := read(r.Body)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			logger.Log("login", err)
+			internalError(w, err, "login")
 			return
 		}
 
@@ -49,14 +48,20 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		// find user by email
 		u, err := userService.lookupByEmail(login.Email)
 		if err != nil {
+			// Mark this (and password check) as failure only because
+			// the user is involved at this point. Otherwise it's their
+			// developer's problem (i.e. bad json).
+			authFailures.With("method", "web").Add(1)
 			encodeError(w, errUserNotFound)
 		}
 
 		// find user by userId and password
 		if err := auth.check(u.ID, login.Password); err != nil {
+			authFailures.With("method", "web").Add(1)
 			w.WriteHeader(http.StatusForbidden)
 			return
 		} else {
+			authSuccesses.With("method", "web").Add(1)
 			w.WriteHeader(http.StatusOK)
 			// TODO(adam): return user json
 			// TODO(adam): set cookie

@@ -39,3 +39,9 @@ func encodeError(w http.ResponseWriter, err error) {
 		"error": err.Error(),
 	})
 }
+
+func internalError(w http.ResponseWriter, err error, component string) {
+	internalServerErrors.Add(1)
+	w.WriteHeader(http.StatusInternalServerError)
+	logger.Log(component, err)
+}

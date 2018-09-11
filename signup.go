@@ -39,8 +39,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		}
 		bs, err := read(r.Body)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			logger.Log("signup", err)
+			internalError(w, err, "signup")
 			return
 		}
 
@@ -57,8 +56,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		if err != nil {
 			// TODO(adam): should we return the raw error back? info disclosure?
 			encodeError(w, err)
-			w.WriteHeader(http.StatusInternalServerError)
-			logger.Log("signup", err)
+			internalError(w, err, "signup")
 			return
 		}
 		if u == nil {
@@ -81,8 +79,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			userId := generateID()
 			if userId == "" {
 				encodeError(w, err)
-				w.WriteHeader(http.StatusInternalServerError)
-				logger.Log("signup", fmt.Sprintf("blank userId generated, err=%v", err))
+				internalError(w, fmt.Errorf("blank userId generated, err=%v", err), "signup")
 				return
 			}
 			u = &User{
@@ -97,8 +94,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			if err := userService.upsert(u); err != nil {
 				// TODO(adam): should we return the raw error back? info disclosure?
 				encodeError(w, err)
-				w.WriteHeader(http.StatusInternalServerError)
-				logger.Log("signup", fmt.Sprintf("problem writing user: %v", err))
+				internalError(w, fmt.Errorf("problem writing user: %v", err), "signup")
 				return
 			}
 
@@ -106,8 +102,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 
 			if err := auth.write(u.ID, signup.Password); err != nil {
 				encodeError(w, errors.New("problem writing user credentials"))
-				w.WriteHeader(http.StatusInternalServerError)
-				logger.Log("signup", fmt.Sprintf("problem writing user credentials: %v", err))
+				internalError(w, fmt.Errorf("problem writing user credentials: %v", err), "signup")
 				return
 			}
 		} else {

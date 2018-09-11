@@ -23,6 +23,7 @@ func logoutRoute(auth authable) func(w http.ResponseWriter, r *http.Request) {
 		if err := auth.invalidate(id); err != nil {
 			// TODO(adam): log or metrics
 		}
+		authInactivations.With("method", "web").Add(1)
 		w.WriteHeader(http.StatusOK)
 	}
 }

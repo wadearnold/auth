@@ -36,6 +36,15 @@ var (
 		Name: "auth_failures",
 		Help: "Count of failed authorizations",
 	}, []string{"method"})
+	authInactivations = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Name: "auth_inactivations",
+		Help: "Count of inactivated auths (i.e. user logout)",
+	}, []string{"method"})
+
+	internalServerErrors = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Name: "http_errors",
+		Help: "Count of how many 5xx errors we send out",
+	}, nil)
 
 	tokenGenerations = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 		Name: "auth_token_generations",

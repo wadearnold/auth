@@ -111,5 +111,9 @@ func (o *oauth) tokenHandler(w http.ResponseWriter, r *http.Request) {
 		encodeError(w, err)
 		return
 	}
-	tokenGenerations.With("method", "oauth2").Add(1)
+	// TODO(adam): We need to track this metric inside our TokenStorage.
+	// HandleTokenRequest currently returns nil even if the token request
+	// failed. There's no real way to inspect the http.ResponseWriter in
+	// an attempt to correctly calculate this.
+	// tokenGenerations.With("method", "oauth2").Add(1)
 }
