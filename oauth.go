@@ -65,17 +65,14 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	return out, nil
 }
 
-func oauthHandler(o *oauth, logger log.Logger) http.Handler {
-	r := mux.NewRouter()
+// addOAuthRoutes includes our oauth2 routes on the provided mux.Router
+func addOAuthRoutes(r *mux.Router, o *oauth, logger log.Logger) {
 	r.Methods("GET").Path("/authorize").HandlerFunc(o.authorizeHandler)
-
 	if o.server.Config.AllowGetAccessRequest {
 		r.Methods("GET").Path("/token").HandlerFunc(o.tokenHandler)
 	} else {
 		r.Methods("POST").Path("/token").HandlerFunc(o.tokenHandler)
 	}
-
-	return r
 }
 
 // authorizeHandler checks the request for appropiate oauth information
