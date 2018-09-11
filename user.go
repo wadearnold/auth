@@ -5,9 +5,9 @@
 package main
 
 import (
-	"fmt"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
