@@ -33,11 +33,17 @@ func (s *Server) BindAddress() string {
 
 // Start brings up the admin HTTP service. This call blocks.
 func (s *Server) Listen() error {
+	if s == nil || s.svc == nil {
+		return nil
+	}
 	return s.svc.ListenAndServe()
 }
 
 // Shutdown unbinds the HTTP server.
 func (s *Server) Shutdown() {
+	if s == nil || s.svc == nil {
+		return
+	}
 	s.svc.Shutdown(nil)
 }
 
