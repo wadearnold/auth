@@ -15,11 +15,11 @@ type loginRequest struct {
 	password string `json:"password"`
 }
 
-func addLoginRoutes(router *mux.Router, logger log.Logger, auther authable, userService userRepository) {
-	router.Methods("POST").Path("/users/login").HandlerFunc(loginRoute(auther, userService))
+func addLoginRoutes(router *mux.Router, logger log.Logger, auth authable, userService userRepository) {
+	router.Methods("POST").Path("/users/login").HandlerFunc(loginRoute(auth, userService))
 }
 
-func loginRoute(auther authable, userService userRepository) func(w http.ResponseWriter, r *http.Request) {
+func loginRoute(auth authable, userService userRepository) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		email := "" // TODO(adam)
 		u, err := userService.lookupByEmail(email)
@@ -28,7 +28,7 @@ func loginRoute(auther authable, userService userRepository) func(w http.Respons
 		}
 
 		pass := "" // TOOD(adam)
-		if err := auther.check(u.ID, pass); err != nil {
+		if err := auth.check(u.ID, pass); err != nil {
 			w.WriteHeader(http.StatusForbidden)
 
 		} else {

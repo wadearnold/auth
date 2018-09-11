@@ -10,16 +10,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func addLogoutRoutes(router *mux.Router, logger log.Logger, auther authable) {
-	router.Methods("DELETE").Path("/users/login").HandlerFunc(logoutRoute(auther))
+func addLogoutRoutes(router *mux.Router, logger log.Logger, auth authable) {
+	router.Methods("DELETE").Path("/users/login").HandlerFunc(logoutRoute(auth))
 }
 
-func logoutRoute(auther authable) func(w http.ResponseWriter, r *http.Request) {
+func logoutRoute(auth authable) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO(adam): get u.ID from request (cookie)
 		// TODO(adam): that extraction will be used in all other routes
 		id := "" // TODO
-		if err := auther.invalidate(id); err != nil {
+		if err := auth.invalidate(id); err != nil {
 			// TODO(adam): log or metrics
 		}
 		w.WriteHeader(http.StatusOK)

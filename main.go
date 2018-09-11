@@ -73,7 +73,7 @@ func main() {
 	addOAuthRoutes(router, oauth, logger)
 
 	// user services
-	authService := &auther{}               // TOOD(adam):
+	authService := &auth{}                 // TOOD(adam):
 	userService := &sqliteUserRepository{} // TODO(adam)
 
 	// user routes

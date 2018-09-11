@@ -24,11 +24,11 @@ type signupRequest struct {
 	CompanyURL string `json:"company_url"`
 }
 
-func addSignupRoutes(router *mux.Router, logger log.Logger, auther authable, userService userRepository) {
-	router.Methods("POST").Path("/users/create").HandlerFunc(signupRoute(auther, userService))
+func addSignupRoutes(router *mux.Router, logger log.Logger, auth authable, userService userRepository) {
+	router.Methods("POST").Path("/users/create").HandlerFunc(signupRoute(auth, userService))
 }
 
-func signupRoute(auther authable, userService userRepository) func(w http.ResponseWriter, r *http.Request) {
+func signupRoute(auth authable, userService userRepository) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		email := "" // TODO(adam)
 		u, _ := userService.lookupByEmail(email)
@@ -57,7 +57,7 @@ func signupRoute(auther authable, userService userRepository) func(w http.Respon
 			}
 
 			// TODO(adam): check password requirements ?
-			if err := auther.write(u.ID, signup.Password); err != nil {
+			if err := auth.write(u.ID, signup.Password); err != nil {
 				panic(err.Error())
 			}
 		}

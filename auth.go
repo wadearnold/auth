@@ -17,16 +17,16 @@ type authable interface {
 	write(userId string, pass string) error
 }
 
-type auther struct{}
+type auth struct{}
 
-func (a *auther) invalidate(userId string) error {
+func (a *auth) invalidate(userId string) error {
 	return nil
 }
 
-func (a *auther) check(userId string, pass string) error {
+func (a *auth) check(userId string, pass string) error {
 	return nil
 }
 
-func (a *auther) write(userId string, pass string) error {
+func (a *auth) write(userId string, pass string) error {
 	return nil
 }
