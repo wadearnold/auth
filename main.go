@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/metrics/prometheus"
+	"github.com/gorilla/mux"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
@@ -65,7 +66,20 @@ func main() {
 	if err != nil {
 		panic(err.Error()) // TODO(adam)
 	}
-	handler := oauthHandler(oauth, logger)
+
+	router := mux.NewRouter()
+
+	// api routes
+	addOAuthRoutes(router, oauth, logger)
+
+	// user services
+	authService := &auther{}               // TOOD(adam):
+	userService := &sqliteUserRepository{} // TODO(adam)
+
+	// user routes
+	addLoginRoutes(router, logger, authService, userService)
+	addLogoutRoutes(router, logger, authService)
+	addSignupRoutes(router, logger, authService, userService)
 
 	readTimeout, _ := time.ParseDuration("30s")
 	writTimeout, _ := time.ParseDuration("30s")
@@ -73,7 +87,7 @@ func main() {
 
 	serve := &http.Server{
 		Addr:    *httpAddr,
-		Handler: handler,
+		Handler: router,
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify:       false,
 			PreferServerCipherSuites: true,
