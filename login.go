@@ -11,8 +11,8 @@ import (
 )
 
 type loginRequest struct {
-	email    string `json:"email"`
-	password string `json:"password"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 func addLoginRoutes(router *mux.Router, logger log.Logger, auth authable, userService userRepository) {
