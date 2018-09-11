@@ -28,6 +28,7 @@ var (
 	logger log.Logger
 
 	// Metrics
+	// TODO(adam): be super fancy and generate README.md table in go:generate
 	authSuccesses = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 		Name: "auth_successes",
 		Help: "Count of successful authorizations",

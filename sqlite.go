@@ -29,6 +29,8 @@ var (
 
 	migrations = []string{
 		// Initial user setup
+		//
+		// TODO(adam): be super fancy and generate README.md table in go:generate
 		`create table if not exists users(user_id primary key, email, clean_email, created_at timestamp);`,
 		`create table if not exists user_approval_codes (user_id primary key, code, valid_until timestamp);`,
 		`create table if not exists user_details(user_id primary key, first_name, last_name, phone, company_url);`,
