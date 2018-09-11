@@ -5,8 +5,6 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -83,12 +81,12 @@ func (o *oauth) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	ti, err := o.server.ValidationBearerToken(r)
 	if err != nil {
 		authFailures.With("method", "oauth2").Add(1)
-		encodeError(nil, err, w)
+		encodeError(w, err)
 		return
 	}
 	if ti.GetClientID() == "" {
 		authFailures.With("method", "oauth2").Add(1)
-		encodeError(nil, fmt.Errorf("missing client_id"), w)
+		encodeError(w, fmt.Errorf("missing client_id"))
 		return
 	}
 
@@ -103,20 +101,8 @@ func (o *oauth) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 func (o *oauth) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := o.server.HandleTokenRequest(w, r)
 	if err != nil {
-		encodeError(nil, err, w)
+		encodeError(w, err)
 		return
 	}
 	tokenGenerations.With("method", "oauth2").Add(1)
-}
-
-// encodeError JSON encodes the supplied error
-func encodeError(_ context.Context, err error, w http.ResponseWriter) {
-	if err == nil {
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error": err.Error(),
-	})
 }

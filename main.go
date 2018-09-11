@@ -64,7 +64,8 @@ func main() {
 
 	oauth, err := setupOauthServer(logger)
 	if err != nil {
-		panic(err.Error()) // TODO(adam)
+		logger.Log("oauth", err)
+		errs <- err
 	}
 
 	router := mux.NewRouter()
@@ -73,7 +74,7 @@ func main() {
 	addOAuthRoutes(router, oauth, logger)
 
 	// user services
-	authService := &auth{}                 // TOOD(adam):
+	authService := &auth{}                 // TOOD(adam)
 	userService := &sqliteUserRepository{} // TODO(adam)
 
 	// user routes

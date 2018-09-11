@@ -5,6 +5,9 @@
 package main
 
 import (
+	"fmt"
+	"crypto/rand"
+	"encoding/hex"
 	"regexp"
 	"strings"
 	"time"
@@ -35,15 +38,19 @@ var (
 	dropPeriods      = strings.NewReplacer(".", "")
 )
 
-// CleanEmail strips all the funky characters from an email address.
+func (u *User) cleanEmail() string {
+	return cleanEmail(u.Email)
+}
+
+// cleanEmail strips all the funky characters from an email address.
 //
 // Essentially this boils down to the following pattern (ignoring case):
 //   [a-z0-9]@[a-z0-9].[a-z]
 //
 // Callers should be aware of when an empty string is returned.
-func (u *User) CleanEmail() string {
+func cleanEmail(email string) string {
 	// split at '@'
-	parts := strings.Split(u.Email, "@")
+	parts := strings.Split(email, "@")
 	if len(parts) != 2 {
 		return ""
 	}
@@ -52,6 +59,19 @@ func (u *User) CleanEmail() string {
 	parts[0] = dropPeriods.Replace(parts[0])
 
 	return strings.Join(parts, "@")
+}
+
+// generateID creates a new ID for our auth system.
+// Do no assume anything about these ID's other than
+// they are strings. Case matters
+func generateID() string {
+	bs := make([]byte, 20)
+	n, err := rand.Read(bs)
+	if err != nil || n == 0 {
+		logger.Log("generateID", fmt.Sprintf("n=%d, err=%v", n, err))
+		return ""
+	}
+	return strings.ToLower(hex.EncodeToString(bs))
 }
 
 type userRepository interface {

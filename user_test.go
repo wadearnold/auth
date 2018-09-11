@@ -21,10 +21,9 @@ func TestUser__cleanEmail(t *testing.T) {
 		{"john.+@gmail.com", "john@gmail.com"},
 	}
 
-	u := &User{}
 	for i := range cases {
-		u.Email = cases[i].input
-		if res := u.CleanEmail(); res != cases[i].expected {
+		res := cleanEmail(cases[i].input)
+		if res != cases[i].expected {
 			t.Errorf("got %q", res)
 		}
 	}

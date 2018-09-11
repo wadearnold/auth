@@ -4,7 +4,9 @@
 package main
 
 import (
+	"errors"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -30,21 +32,60 @@ func addSignupRoutes(router *mux.Router, logger log.Logger, auth authable, userS
 
 func signupRoute(auth authable, userService userRepository) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		email := "" // TODO(adam)
-		u, _ := userService.lookupByEmail(email)
-		// TODO(adam): if user is found error and return back
-		if u == nil { // TODO(adam): check err == "no user found"
+		if r.Body == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		bs, err := read(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Log("signup", err)
+			return
+		}
+
+		// read request body
+		var signup signupRequest
+		if err := json.Unmarshal(bs, &signup); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Log("login", err)
+			return
+		}
+
+		// find user
+		u, err := userService.lookupByEmail(signup.Email)
+		if err != nil {
+			// TODO(adam): should we return the raw error back? info disclosure?
+			encodeError(w, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Log("signup", err)
+			return
+		}
+		if u == nil {
 			var signup signupRequest
 			bs, err := ioutil.ReadAll(r.Body)
 			if err != nil {
-				panic(err.Error())
+				encodeError(w, err)
+				w.WriteHeader(http.StatusBadRequest)
+				logger.Log("signup", fmt.Sprintf("failed reading request: %v", err))
+				return
 			}
 			if err := json.Unmarshal(bs, &signup); err != nil {
-				panic(err.Error())
+				encodeError(w, err)
+				w.WriteHeader(http.StatusBadRequest)
+				logger.Log("signup", fmt.Sprintf("failed parsing request json: %v", err))
+				return
 			}
 
+			// store user
+			userId := generateID()
+			if userId == "" {
+				encodeError(w, err)
+				w.WriteHeader(http.StatusInternalServerError)
+				logger.Log("signup", fmt.Sprintf("blank userId generated, err=%v", err))
+				return
+			}
 			u = &User{
-				ID:         "", // TODO(adam)
+				ID:         userId,
 				Email:      signup.Email,
 				FirstName:  signup.FirstName,
 				LastName:   signup.LastName,
@@ -53,16 +94,27 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 				CreatedAt:  time.Now(),
 			}
 			if err := userService.upsert(u); err != nil {
-				panic(err.Error())
+				// TODO(adam): should we return the raw error back? info disclosure?
+				encodeError(w, err)
+				w.WriteHeader(http.StatusInternalServerError)
+				logger.Log("signup", fmt.Sprintf("problem writing user: %v", err))
+				return
 			}
 
 			// TODO(adam): check password requirements ?
+
 			if err := auth.write(u.ID, signup.Password); err != nil {
-				panic(err.Error())
+				encodeError(w, errors.New("problem writing user credentials"))
+				w.WriteHeader(http.StatusInternalServerError)
+				logger.Log("signup", fmt.Sprintf("problem writing user credentials: %v", err))
+				return
 			}
+		} else {
+			// user found, so reject signup
+			encodeError(w, errors.New("user already exists"))
+			w.WriteHeader(http.StatusForbidden)
 		}
 
 		// TODO(adam): wipe all old cookies? (ones we got in request)
-		w.WriteHeader(http.StatusOK)
 	}
 }

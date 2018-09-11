@@ -36,8 +36,9 @@ func main() {
 		panic(err.Error())
 	}
 
-	// Grab (parts) of the token from JSON. Not every field matches up (renewal_token / expiry).
-	// TODO(adam): fix? this json read
+	// The fields on oauth2.Token don't all match up to the response body,
+	// but we can grab the access_token and token_type fields as that turns
+	// out to be all we need for successful requests.
 	var token oauth2.Token
 	if err := json.Unmarshal(bs, &token); err != nil {
 		panic(err.Error())
