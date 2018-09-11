@@ -17,6 +17,13 @@ import (
 	"gopkg.in/oauth2.v3/store"
 )
 
+// TODO(adam): sqlite persistence
+
+// TODO(adam): when a user signs up generate a client ID/secret
+// and save that into the sqlite db. Return ^ as part of signup json
+
+// TODO(adam): endpoint(s) to roll client ID/secret
+
 type oauth struct {
 	manager     *manage.Manager
 	clientStore *store.ClientStore

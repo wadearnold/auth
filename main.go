@@ -62,6 +62,12 @@ func main() {
 		errs <- fmt.Errorf("%s", <-c)
 	}()
 
+	// migrate database
+	if err := migrate(); err != nil {
+		logger.Log("sqlite", err)
+		os.Exit(1)
+	}
+
 	oauth, err := setupOauthServer(logger)
 	if err != nil {
 		logger.Log("oauth", err)
@@ -120,6 +126,11 @@ func main() {
 	}()
 
 	if err := <-errs; err != nil {
+		if db != nil {
+			if err := db.Close(); err != nil {
+				logger.Log("sqlite", err)
+			}
+		}
 		adminService.Shutdown()
 		shutdownServer()
 		logger.Log("exit", err)

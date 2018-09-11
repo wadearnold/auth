@@ -12,3 +12,6 @@
 *.out
 
 /bin/
+
+# sqlite database
+auth.db

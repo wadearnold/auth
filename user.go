@@ -17,12 +17,8 @@ import (
 // - handle signup route POST /account
 // - dedup users based on "clean_email" (no special chars, i.e. . - + )
 // - validate email (by sending with approval_code) [probably diff file]
-// - password (bcrypt), per-row salt
 
-// postgres:
-//  - users (user_id, email, clean_email, password, salt, created_at)
-//  - user_details (user_id, first_name, last_name, company_url)
-//  - user_approval_codes (account_id, code, valid_until)
+// TODO(adam): having a row in user_approval_codes means user isn't verified. Delete on email approval.
 
 type User struct {
 	ID                  string

@@ -8,7 +8,6 @@ Optional (company URL)
 ** password?
 ** [optional] profile CRUD routes
 * postgres
-** accounts (account_id, email, clean_email, password, salt, approval_code, created_at)
 ** api_tokens (account_id, token, valid_until)
 * use traefik for api gateway
 * route structure
