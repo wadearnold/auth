@@ -42,6 +42,6 @@ deploy:
       condition: $LATEST = true
       branch: master
   provider: script
-  script: bash .travis-ci/docker_push
+  script: bash docker_push
   on:
     branch: master
