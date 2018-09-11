@@ -9,8 +9,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+
+	kitprom "github.com/go-kit/kit/metrics/prometheus"
+	stdprom "github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -29,16 +33,30 @@ var (
 		`create table if not exists user_details(user_id primary key, first_name, last_name, phone, company_url);`,
 		`create table if not exists user_approval_codes (user_id, code, valid_until);`,
 	}
+
+	// Metrics
+	connections = kitprom.NewGaugeFrom(stdprom.GaugeOpts{
+		Name: "sqlite_connections",
+		Help: "How many sqlite connections and what status they're in.",
+	}, []string{"state"})
 )
 
-// TODO(adam): prometheus metrics
-// $ go doc database/sql dbstats
-// type DBStats struct {
-// 	MaxOpenConnections int // Maximum number of open connections to the database.
-// 	OpenConnections int // The number of established connections both in use and idle.
-// 	InUse           int // The number of connections currently in use.
-// 	Idle            int // The number of idle connections.
-// }
+type promMetricCollector struct{}
+
+func (promMetricCollector) run() {
+	if db == nil {
+		return
+	}
+
+	for {
+		stats := db.Stats()
+		connections.With("state", "idle").Set(float64(stats.Idle))
+		connections.With("state", "inuse").Set(float64(stats.InUse))
+		connections.With("state", "open").Set(float64(stats.OpenConnections))
+
+		time.Sleep(1)
+	}
+}
 
 func init() {
 	path := os.Getenv("SQLITE_DB_PATH")
@@ -56,6 +74,9 @@ func init() {
 	}
 	db = d
 	sqlitePath = path
+
+	prom := promMetricCollector{}
+	go prom.run()
 }
 
 func migrate() error {
