@@ -1,11 +1,11 @@
-# build stage
-FROM golang:alpine AS build-env
-ADD . /src
-RUN cd /src && go build -o auth
+FROM golang:1.11-alpine as builder
+WORKDIR /go/src/github.com/moov-io/auth
+RUN apk -U add make
+COPY . .
+RUN make build
 
-# final stage
-FROM alpine
-WORKDIR /moov
-COPY --from=build-env /src/auth /moov/
-ENTRYPOINT ./auth
+FROM scratch
+COPY --from=builder /go/src/github.com/moov-io/auth/bin/auth /bin/auth
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 EXPOSE 8080
+ENTRYPOINT ["/bin/server"]
