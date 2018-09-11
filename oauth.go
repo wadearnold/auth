@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
@@ -38,7 +39,11 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	}
 
 	// oauth2 setup
-	tokenStore, err := store.NewMemoryTokenStore()
+	path := os.Getenv("OAUTH2_DB_PATH")
+	if path == "" {
+		path = "oauth2.db"
+	}
+	tokenStore, err := store.NewFileTokenStore(path)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating token store: %v", err)
 	}

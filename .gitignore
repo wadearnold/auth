@@ -13,5 +13,5 @@
 
 /bin/
 
-# sqlite database
-auth.db
+# buntdb/sqlite database
+*.db

@@ -2,6 +2,17 @@
 
 This is moov.io's api auth service.
 
+### runbook
+
+// TODO(adam)
+
+### configuration
+
+The follow are environment variables which
+
+- `OAUTH2_DB_PATH`: TODO
+- `SQLITE_DB_PATH`: TODO
+
 ### metrics
 
 <dl>
