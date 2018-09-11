@@ -1,0 +1,47 @@
+language: go
+sudo: true
+services:
+    - docker
+os:
+- linux
+- osx
+go:
+- 1.11
+osx_image: xcode9.1
+before_install:
+- go get -u github.com/client9/misspell/cmd/misspell
+- go get -u golang.org/x/lint/golint
+- go get github.com/fzipp/gocyclo
+# deploys help
+- go get github.com/mitchellh/gox
+- go get github.com/tcnksm/ghr
+before_script:
+- GOFILES=$(find . -type f -name '*.go' | grep -v vendor)
+script:
+- test -z $(gofmt -s -l $GOFILES)
+- go test ./...
+- misspell -error -locale US $GOFILES
+- gocyclo -over 19 $GOFILES
+- golint -set_exit_status $GOFILES
+after_success:
+  - docker build -t moov/auth .
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: $GITHUB_TOKEN
+  file: 
+    - auth.windows.amd64.exe
+    - auth.windows.386.exe
+    - auth.darwin.amd64
+    - auth.linux.amd64
+    - auth.linux.386
+  on:
+      repo: moov-io/auth
+      tags: true
+      condition: $LATEST = true
+      branch: master
+  provider: script
+  script: bash .travis-ci/docker_push
+  on:
+    branch: master

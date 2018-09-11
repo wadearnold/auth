@@ -78,7 +78,7 @@ func oauthHandler(o *oauth, logger log.Logger) http.Handler {
 	return r
 }
 
-// authorizeHandler checks the request for appropiate oauth information
+// authorizeHandler checks the request for appropriate oauth information
 // and returns "200 OK" if the token is valid.
 func (o *oauth) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	// We aren't using HandleAuthorizeRequest here because that assumes redirect_uri
