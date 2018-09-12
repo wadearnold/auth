@@ -13,6 +13,16 @@ The follow are environment variables which
 - `OAUTH2_DB_PATH`: TODO
 - `SQLITE_DB_PATH`: TODO
 
+### routes
+
+- DELETE /users/login
+- GET    /authorize
+- GET    /token
+- POST   /token
+- POST   /token/recreate
+- POST   /users/create
+- POST   /users/login
+
 ### metrics
 
 <dl>
