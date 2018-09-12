@@ -4,6 +4,14 @@
 
 // buntdbclient implements ClientStore from gopkg.in/oauth2.v3
 // using BuntDB (https://github.com/tidwall/buntdb).
+//
+// A few extra operations have been added though, such as Set and
+// GetByUserId. These were needed for ourusecase as we're mutating
+// the oauth cleints.
+//
+// Tests can be ran with a database in the package dir, just add -debug
+// as a flag to 'go test'.
+// The local database will be deleted before tests are ran each time.
 package buntdbclient
 
 import (
@@ -20,26 +28,35 @@ var (
 	DefaultTTL time.Duration = 24 * time.Hour
 )
 
-func New(path string) (oauth2.ClientStore, error) {
+// New initializes a new BuntDB database with any indicies needed
+// for the Get* operations.
+func New(path string) (*ClientStore, error) {
 	db, err := buntdb.Open(path)
 	if err != nil {
 		return nil, err
 	}
+
+	// Migrations
+	db.CreateIndex("user_id", "*", buntdb.IndexJSON("UserID")) // ScanByUserId
+
 	return &ClientStore{
 		db: db,
 	}, nil
 }
 
+// ClientStore wraps oauth2.ClientStore
 type ClientStore struct {
 	oauth2.ClientStore
 
 	db *buntdb.DB
 }
 
+// Close shuts down connections to the underlying database
 func (cs *ClientStore) Close() error {
 	return cs.db.Close()
 }
 
+// GetById returns an oauth2.ClientInfo if the ID matches id.
 func (cs *ClientStore) GetByID(id string) (oauth2.ClientInfo, error) {
 	var cli models.Client
 	cli.ID = id
@@ -71,6 +88,7 @@ func (cs *ClientStore) GetByID(id string) (oauth2.ClientInfo, error) {
 	return &cli, nil
 }
 
+// Set writes the oauth2.ClientInfo to the underlying database.
 func (cs *ClientStore) Set(id string, cli oauth2.ClientInfo) error {
 	if inc := cli.GetID(); id != inc {
 		return fmt.Errorf("ClientStore: id's don't match, id=%s and cli=%s", id, inc)
@@ -96,4 +114,51 @@ func (cs *ClientStore) Set(id string, cli oauth2.ClientInfo) error {
 		return fmt.Errorf("problem updating %s: %v", id, err)
 	}
 	return nil
+}
+
+// GetByUserID returns an array of oauth2.ClientInfo which have a UserID mathcing
+// userId.
+// If return values are nil that means no matching records were found.
+func (cs *ClientStore) GetByUserID(userId string) ([]oauth2.ClientInfo, error) {
+	keys := make(map[string]bool, 0)
+
+	err := cs.db.View(func(tx *buntdb.Tx) error {
+		return tx.AscendEqual("user_id", userId, func(k,v string) bool {
+			if v == userId {
+				keys[k] = true
+			}
+			if k > userId {
+				// quit iterating once we go "past" userId
+				return false
+			}
+			return true
+		})
+	})
+	if err != nil {
+		fmt.Println("A")
+		return nil, err
+	}
+
+	// Grab each ClientInfo now
+	var accum []oauth2.ClientInfo
+	for k,_ := range keys {
+		ci, _ := cs.GetByID(k)
+		if ci != nil {
+			accum = append(accum, ci)
+		}
+	}
+	if len(accum) == 0 {
+		return nil, nil
+	}
+	return accum, nil
+}
+
+// DeleteByID removes the oauth2.ClientInfo for the provided id.
+func (cs *ClientStore) DeleteByID(id string) error {
+	return cs.db.Update(func(tx *buntdb.Tx) (e error) {
+		tx.Delete(fmt.Sprintf("%s-secret", id))
+		tx.Delete(fmt.Sprintf("%s-domain", id))
+		_, err := tx.Delete(fmt.Sprintf("%s-user-id", id))
+		return err
+	})
 }
