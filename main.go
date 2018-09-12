@@ -145,6 +145,7 @@ func main() {
 				logger.Log("sqlite", err)
 			}
 		}
+		oauth.shutdown()
 		adminService.Shutdown()
 		shutdownServer()
 		logger.Log("exit", err)

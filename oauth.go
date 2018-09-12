@@ -9,25 +9,20 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/moov-io/auth/pkg/buntdbclient"
+
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/errors"
 	"gopkg.in/oauth2.v3/manage"
-	"gopkg.in/oauth2.v3/models"
 	"gopkg.in/oauth2.v3/server"
 	"gopkg.in/oauth2.v3/store"
 )
 
-// TODO(adam): sqlite persistence
-
-// TODO(adam): when a user signs up generate a client ID/secret
-// and save that into the sqlite db. Return ^ as part of signup json
-
-// TODO(adam): endpoint(s) to roll client ID/secret
-
 type oauth struct {
 	manager     *manage.Manager
-	clientStore *store.ClientStore
+	clientStore *oauth2.ClientStore
 	server      *server.Server
 
 	logger log.Logger
@@ -39,9 +34,9 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	}
 
 	// oauth2 setup
-	path := os.Getenv("OAUTH2_DB_PATH")
+	path := os.Getenv("OAUTH2_TOKENS_DB_PATH")
 	if path == "" {
-		path = "oauth2.db"
+		path = "oauth2_tokens.db"
 	}
 	tokenStore, err := store.NewFileTokenStore(path)
 	if err != nil {
@@ -51,14 +46,16 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	out.manager = manage.NewDefaultManager()
 	out.manager.MapTokenStorage(tokenStore)
 
-	out.clientStore = store.NewClientStore()
-	out.clientStore.Set("000000", &models.Client{
-		ID:     "000000", // TODO(adam): yea, yea..
-		Secret: "999999",
-		Domain: "http://localhost",
-		// TODO(adam): limit scopes
-	})
-	out.manager.MapClientStorage(out.clientStore)
+	path = os.Getenv("OAUTH2_CLIENTS_DB_PATH")
+	if path == "" {
+		path = "oauth2_clients.db"
+	}
+	cs, err := buntdbclient.New(path)
+	if err != nil {
+		return nil, fmt.Errorf("problem creating clients store: %v", err)
+	}
+	out.clientStore = &cs
+	out.manager.MapClientStorage(*out.clientStore)
 
 	out.server = server.NewDefaultServer(out.manager)
 	out.server.SetAllowGetAccessRequest(true)

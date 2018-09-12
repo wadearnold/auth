@@ -43,7 +43,7 @@ require (
 	github.com/smartystreets/goconvey v0.0.0-20180222194500-ef6db91d284a // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
 	github.com/tidwall/btree v0.0.0-20170113224114-9876f1454cf0 // indirect
-	github.com/tidwall/buntdb v1.0.0 // indirect
+	github.com/tidwall/buntdb v1.0.0
 	github.com/tidwall/gjson v1.1.3 // indirect
 	github.com/tidwall/grect v0.0.0-20161006141115-ba9a043346eb // indirect
 	github.com/tidwall/match v0.0.0-20171002075945-1731857f09b1 // indirect
