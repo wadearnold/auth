@@ -114,3 +114,12 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		// TODO(adam): wipe all old cookies? (ones we got in request)
 	}
 }
+
+
+// Notes
+//
+// On signup, we create an oauth2 (model.Token) with random client id/secret,
+// domain (todo?), and UserID set to our value, write that (using o.clientStore).
+//
+// Then, when we need to scan (can we scan by an attribute) by UserID (index name: user_id)
+// cs.GetByUserId

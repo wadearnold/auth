@@ -13,16 +13,16 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/errors"
 	"gopkg.in/oauth2.v3/manage"
+	"gopkg.in/oauth2.v3/models"
 	"gopkg.in/oauth2.v3/server"
 	"gopkg.in/oauth2.v3/store"
 )
 
 type oauth struct {
 	manager     *manage.Manager
-	clientStore *oauth2.ClientStore
+	clientStore *buntdbclient.ClientStore
 	server      *server.Server
 
 	logger log.Logger
@@ -54,8 +54,8 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	if err != nil {
 		return nil, fmt.Errorf("problem creating clients store: %v", err)
 	}
-	out.clientStore = &cs
-	out.manager.MapClientStorage(*out.clientStore)
+	out.clientStore = cs
+	out.manager.MapClientStorage(out.clientStore)
 
 	out.server = server.NewDefaultServer(out.manager)
 	out.server.SetAllowGetAccessRequest(true)
@@ -80,6 +80,7 @@ func addOAuthRoutes(r *mux.Router, o *oauth, logger log.Logger) {
 	} else {
 		r.Methods("POST").Path("/token").HandlerFunc(o.tokenHandler)
 	}
+	r.Methods("POST").Path("/token/recreate").HandlerFunc(o.recreateTokenHandler)
 }
 
 // authorizeHandler checks the request for appropriate oauth information
@@ -119,13 +120,51 @@ func (o *oauth) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	// an attempt to correctly calculate this.
 	// tokenGenerations.With("method", "oauth2").Add(1)
 }
+
+// recreateTokenHandler will recreate the oauth token for a user. This involves:
+//  - invalidate all existing tokens
+//  - creates new tokens (and returns them only once)
+//
+// This method extracts the user from the cookies in r.
+func (o *oauth) recreateTokenHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO(adam): find user via cookies, grab their oauth2 tokens, upsert values
+	// TODO(adam): tokenGenerations.With("method", "oauth2_via_web").Add(1)
+
+	// Probably want to know o.clientStore is a buntdbclient.ClientStore, so
+	// then we can add methods on there we need.
+
+	userId := "" // TODO(adam)
+	records, err := o.clientStore.GetByUserID(userId)
+
+	if records == nil && err == nil { // nothing found
+		o.logger.Log("oauth", fmt.Sprintf("userId=%s had no oauth clients", userId))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	for i := range records {
+		if err := o.clientStore.DeleteByID(records[i].GetID()); err != nil {
+			internalError(w, err, "oauth")
+			return
+		}
+
+		// TODO(adam): render these back to user
+		records[i] = &models.Client{
+			ID: "", // TODO(adam)
+			Secret: "",
+			Domain: records[i].GetDomain(),
+			UserID: userId,
+		}
+
+		if err := o.clientStore.Set(records[i].GetID(), records[i]); err != nil {
+			// TODO(adam): log
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (o *oauth) shutdown() error {
 	if o == nil || o.clientStore == nil {
 		return nil
 	}
-	cs, ok := (*o.clientStore).(*buntdbclient.ClientStore)
-	if ok {
-		return cs.Close()
-	}
-	return nil
+	return o.clientStore.Close()
 }
