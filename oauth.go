@@ -119,3 +119,13 @@ func (o *oauth) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	// an attempt to correctly calculate this.
 	// tokenGenerations.With("method", "oauth2").Add(1)
 }
+func (o *oauth) shutdown() error {
+	if o == nil || o.clientStore == nil {
+		return nil
+	}
+	cs, ok := (*o.clientStore).(*buntdbclient.ClientStore)
+	if ok {
+		return cs.Close()
+	}
+	return nil
+}
