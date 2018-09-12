@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-kit/kit/log"
 )
 
 // purpose
@@ -80,7 +82,9 @@ type userRepository interface {
 	upsert(*User) error
 }
 
-type sqliteUserRepository struct{}
+type sqliteUserRepository struct {
+	log log.Logger
+}
 
 func (s *sqliteUserRepository) lookupById(id string) (*User, error) {
 	// users and user_details
@@ -112,7 +116,9 @@ type authable interface {
 	writePassword(userId string, pass string) error
 }
 
-type auth struct{}
+type auth struct {
+	log log.Logger
+}
 
 func (a *auth) checkCookies(userId string, cookies []string) error {
 	// user_cookies

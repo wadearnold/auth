@@ -21,7 +21,7 @@ func logoutRoute(auth authable) func(w http.ResponseWriter, r *http.Request) {
 		// TODO(adam): that extraction will be used in all other routes
 		id := "" // TODO
 		if err := auth.invalidateCookies(id); err != nil {
-			// TODO(adam): log or metrics
+			logger.Log("logout", err)
 		}
 		authInactivations.With("method", "web").Add(1)
 		w.WriteHeader(http.StatusOK)
