@@ -53,6 +53,7 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 			// developer's problem (i.e. bad json).
 			authFailures.With("method", "web").Add(1)
 			encodeError(w, errUserNotFound)
+			return
 		}
 
 		// find user by userId and password
