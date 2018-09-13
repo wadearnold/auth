@@ -18,7 +18,7 @@ const (
 	// with an io.LimitReader
 	maxReadBytes = 1 * 1024 * 1024
 
-	cookieName = "moov-io--auth"
+	cookieName = "moov_auth"
 	cookieTTL  = 30 * 24 * time.Hour // days * hours/day * hours
 )
 
@@ -72,7 +72,7 @@ func createCookie(userId string, auth authable) (*http.Cookie, error) {
 		Name:     cookieName,
 		Value:    generateID(),
 		Expires:  time.Now().Add(cookieTTL),
-		Secure:   true,
+		Secure:   serveViaTLS,
 		HttpOnly: true,
 	}
 	if err := auth.writeCookie(userId, cookie); err != nil {

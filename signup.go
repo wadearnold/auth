@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -21,10 +21,10 @@ type signupRequest struct {
 	Password string `json:"password"`
 
 	// misc profile information
-	FirstName  string `json:"first_name"`
-	LastName   string `json:"last_name"`
-	Phone      string `json:"phone_number"`
-	CompanyURL string `json:"company_url"`
+	FirstName  string `json:"firstName"`
+	LastName   string `json:"lastName"`
+	Phone      string `json:"phone"`
+	CompanyURL string `json:"companyUrl,omitempty"`
 }
 
 func addSignupRoutes(router *mux.Router, logger log.Logger, auth authable, userService userRepository) {
@@ -53,7 +53,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 
 		// find user
 		u, err := userService.lookupByEmail(signup.Email)
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "user not found") {
 			// TODO(adam): should we return the raw error back? info disclosure?
 			encodeError(w, err)
 			internalError(w, err, "signup")
@@ -61,16 +61,8 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		}
 		if u == nil {
 			var signup signupRequest
-			bs, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				encodeError(w, err)
-				w.WriteHeader(http.StatusBadRequest)
-				logger.Log("signup", fmt.Sprintf("failed reading request: %v", err))
-				return
-			}
 			if err := json.Unmarshal(bs, &signup); err != nil {
 				encodeError(w, err)
-				w.WriteHeader(http.StatusBadRequest)
 				logger.Log("signup", fmt.Sprintf("failed parsing request json: %v", err))
 				return
 			}
@@ -98,25 +90,20 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 				return
 			}
 
-			// TODO(adam): check password requirements ?
-
 			if err := auth.writePassword(u.ID, signup.Password); err != nil {
 				encodeError(w, errors.New("problem writing user credentials"))
 				internalError(w, fmt.Errorf("problem writing user credentials: %v", err), "signup")
 				return
 			}
+
+			// TODO(adam): signup worked, so render back user and oauth client info
+			//
+			// On signup, we create an oauth2 (model.Token) with random client id/secret,
+			// domain (todo?), and UserID set to our value, write that (using o.clientStore).
+
 		} else {
 			// user found, so reject signup
 			encodeError(w, errors.New("user already exists"))
-			w.WriteHeader(http.StatusForbidden)
 		}
 	}
 }
-
-// Notes
-//
-// On signup, we create an oauth2 (model.Token) with random client id/secret,
-// domain (todo?), and UserID set to our value, write that (using o.clientStore).
-//
-// Then, when we need to scan (can we scan by an attribute) by UserID (index name: user_id)
-// cs.GetByUserId

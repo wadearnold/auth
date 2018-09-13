@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -68,7 +69,7 @@ func cleanEmail(email string) string {
 	parts[0] = dropPlusExtender.ReplaceAllString(parts[0], "")
 	parts[0] = dropPeriods.Replace(parts[0])
 
-	return strings.Join(parts, "@")
+	return strings.ToLower(strings.Join(parts, "@"))
 }
 
 // generateID creates a new ID for our auth system.
@@ -85,7 +86,7 @@ func generateID() string {
 }
 
 type userRepository interface {
-	lookupById(id string) (*User, error)
+	lookupByUserId(id string) (*User, error)
 
 	// lookupByEmail finds a user by the given email address.
 	// It's recommended you provide User.cleanEmail()
@@ -99,20 +100,81 @@ type sqliteUserRepository struct {
 	log log.Logger
 }
 
-func (s *sqliteUserRepository) lookupById(id string) (*User, error) {
-	// users and user_details
-	return nil, nil
+func (s *sqliteUserRepository) lookupByUserId(userId string) (*User, error) {
+	query := `select u.email, u.created_at, ud.first_name, ud.last_name, ud.phone, ud.company_url
+from users as u
+inner join user_details as ud
+on u.user_id = ud.user_id
+where u.user_id = ?
+limit 1`
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	row := stmt.QueryRow(userId)
+
+	u := &User{}
+	u.ID = userId
+	var createdAt string // needs parsing
+	row.Scan(&u.Email, &createdAt, &u.FirstName, &u.LastName, &u.Phone, &u.CompanyURL)
+	t, err := time.Parse(serializedTimestampFormat, createdAt)
+	if err != nil {
+		s.log.Log("user", fmt.Sprintf("bad users.created_at format %q: %v", createdAt, err))
+	}
+	u.CreatedAt = t
+	return u, nil
 }
 
 func (s *sqliteUserRepository) lookupByEmail(email string) (*User, error) {
-	// users
-	var u *User
-	return s.lookupById(u.ID)
+	query := `select user_id from users where clean_email = ?`
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	row := stmt.QueryRow(cleanEmail(email))
+
+	var userId string
+	row.Scan(&userId)
+
+	if userId == "" {
+		return nil, errors.New("user not found")
+	}
+	return s.lookupByUserId(userId)
 }
 
 func (s *sqliteUserRepository) upsert(inc *User) error {
-	// users and user_details
-	return nil
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	// insert/update into 'users'
+	query := `replace into users (user_id, email, clean_email, created_at) values (?, ?, ?, ?)`
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		e := tx.Rollback()
+		return fmt.Errorf("problem preparing users query userId=%s, err=%v, rollback err=%v", inc.ID, err, e)
+	}
+	_, err = stmt.Exec(inc.ID, inc.Email, inc.cleanEmail(), inc.CreatedAt.Format(serializedTimestampFormat))
+	if err != nil {
+		e := tx.Rollback()
+		return fmt.Errorf("problem upserting users userId=%s, err=%v, rollback err=%v", inc.ID, err, e)
+	}
+
+	// insert/update into 'user_details'
+	query = `replace into user_details (user_id, first_name, last_name, phone, company_url) values (?, ?, ?, ?, ?)`
+	stmt, err = tx.Prepare(query)
+	if err != nil {
+		e := tx.Rollback()
+		return fmt.Errorf("problem preparing user_details query userId=%s, err=%v, rollback err=%v", inc.ID, err, e)
+	}
+	_, err = stmt.Exec(inc.ID, inc.FirstName, inc.LastName, inc.Phone, inc.CompanyURL)
+	if err != nil {
+		e := tx.Rollback()
+		return fmt.Errorf("problem upserting user_details userId=%s, err=%v, rollback err=%v", inc.ID, err, e)
+	}
+
+	return tx.Commit()
 }
 
 // authable represents the interactions of a user's authentication
@@ -149,11 +211,12 @@ func (a *auth) findUserId(data string) (string, error) {
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(data)
+	rows, err := stmt.Query(data, time.Now().Format(serializedTimestampFormat))
 	if err != nil {
 		return "", err
 	}
 	defer rows.Close()
+
 	var userId string
 	for rows.Next() {
 		rows.Scan(&userId)
@@ -179,7 +242,8 @@ func (a *auth) invalidateCookies(userId string) error {
 }
 
 func (a *auth) writeCookie(userId string, cookie *http.Cookie) error {
-	stmt, err := a.db.Prepare(`insert into user_cookies values (?, ?, ?)`)
+	query := `insert or replace into user_cookies (user_id, data, valid_until) values (?, ?, ?)`
+	stmt, err := a.db.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -201,7 +265,6 @@ func (a *auth) writeCookie(userId string, cookie *http.Cookie) error {
 // and sad paths take "approximately" the same.
 func (a *auth) fakeBcryptRounds() {
 	id := generateID()
-	bcrypt.GenerateFromPassword([]byte(id), bcryptCostFactor)
 	bcrypt.CompareHashAndPassword([]byte(id), []byte(id))
 }
 
@@ -214,19 +277,16 @@ func (a *auth) checkPassword(userId string, incoming string) error {
 
 	row := stmt.QueryRow(userId)
 	var storedPassword, storedSalt string
-	if err := row.Scan(&storedPassword, storedSalt); err != nil {
+	if err := row.Scan(&storedPassword, &storedSalt); err != nil {
 		a.fakeBcryptRounds()
 		return err
 	}
 
-	incomingPassword, err := bcrypt.GenerateFromPassword([]byte(incoming), bcryptCostFactor)
-	if err != nil {
-		a.fakeBcryptRounds()
-		return err // this path takes less time (no CompareHashAndPassword call)
-	}
-	return bcrypt.CompareHashAndPassword([]byte(storedPassword+storedSalt), incomingPassword)
+	return bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(incoming+storedSalt))
 }
 
+// writePassword saves a user's password. This function performs no authn/z and generates a new
+// salt (which is also saved).
 func (a *auth) writePassword(userId string, pass string) error {
 	salt := generateID()
 	incomingPassword, err := bcrypt.GenerateFromPassword([]byte(pass+salt), bcryptCostFactor)

@@ -63,18 +63,27 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 			logger.Log("login", fmt.Sprintf("userId=%s failed: %v", u.ID, err))
 			w.WriteHeader(http.StatusForbidden)
 			return
-		} else {
-			authSuccesses.With("method", "web").Add(1)
-			w.WriteHeader(http.StatusOK)
-			cookie, err := createCookie(u.ID, auth)
-			if err != nil {
-				internalError(w, err, "login")
-			}
-			http.SetCookie(w, cookie)
-			if err := json.NewEncoder(w).Encode(u); err != nil {
-				internalError(w, err, "login")
-				return
-			}
 		}
+
+		// success route, let's finish!
+		authSuccesses.With("method", "web").Add(1)
+		cookie, err := createCookie(u.ID, auth)
+		if err != nil {
+			internalError(w, err, "login")
+			return
+		}
+		if cookie == nil {
+			logger.Log("login", fmt.Sprintf("nil cookie for userId=%s", u.ID))
+		}
+		if err := auth.writeCookie(u.ID, cookie); err != nil {
+			internalError(w, err, "login")
+			return
+		}
+		if err := json.NewEncoder(w).Encode(u); err != nil {
+			internalError(w, err, "login")
+			return
+		}
+		http.SetCookie(w, cookie)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	}
 }
