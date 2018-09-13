@@ -167,9 +167,9 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 
 		// render back new client info
 		type response struct {
-			clients []*models.Client `json:"clients"`
+			Clients []*models.Client `json:"clients"`
 		}
-		if err := json.NewEncoder(w).Encode(&response{clients: clients}); err != nil {
+		if err := json.NewEncoder(w).Encode(&response{clients}); err != nil {
 			internalError(w, err, "oauth")
 		}
 		w.WriteHeader(http.StatusOK)
