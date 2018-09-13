@@ -13,20 +13,13 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/go-kit/kit/log"
 	kitprom "github.com/go-kit/kit/metrics/prometheus"
 	stdprom "github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	// db is the connection point for making SQL calls to our sqlite database.
-	// You use it like any other database/sql driver. Part of shutdown is to close
-	// out the file/session.
-	//
-	// https://github.com/mattn/go-sqlite3/blob/master/_example/simple/simple.go
-	// https://astaxie.gitbooks.io/build-web-application-with-golang/en/05.3.html
-	db         *sql.DB
-	sqlitePath string
-
+	// migrations holds all our SQL migrations to be done (in order)
 	migrations = []string{
 		// Initial user setup
 		//
@@ -34,7 +27,6 @@ var (
 		`create table if not exists users(user_id primary key, email, clean_email, created_at timestamp);`,
 		`create table if not exists user_approval_codes (user_id primary key, code, valid_until timestamp);`,
 		`create table if not exists user_details(user_id primary key, first_name, last_name, phone, company_url);`,
-
 		`create table if not exists user_cookies(user_id primary key, data, valid_until timestamp);`,
 		`create table if not exists user_passwords(user_id primary key, password, salt);`,
 	}
@@ -48,7 +40,7 @@ var (
 
 type promMetricCollector struct{}
 
-func (promMetricCollector) run() {
+func (promMetricCollector) run(db *sql.DB) {
 	if db == nil {
 		return
 	}
@@ -58,39 +50,55 @@ func (promMetricCollector) run() {
 		connections.With("state", "idle").Set(float64(stats.Idle))
 		connections.With("state", "inuse").Set(float64(stats.InUse))
 		connections.With("state", "open").Set(float64(stats.OpenConnections))
-
 		time.Sleep(1)
 	}
 }
 
-func init() {
+func getSqlitePath() string {
 	path := os.Getenv("SQLITE_DB_PATH")
 	if path == "" || strings.Contains(path, "..") {
 		// set default if empty or trying to escape
 		// don't filepath.ABS to avoid full-fs reads
 		path = "auth.db"
 	}
+	return path
+}
 
-	d, err := sql.Open("sqlite3", path)
+func createConnection(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		err = fmt.Errorf("problem opening sqlite3 file: %v", err)
 		logger.Log("sqlite", err)
-		panic(err.Error())
+		return nil, err
 	}
-	db = d
-	sqlitePath = path
 
 	prom := promMetricCollector{}
-	go prom.run()
+	go prom.run(db) // TODO(adam): not anon goroutine
+
+	return db, nil
 }
 
-func migrate() error {
-	logger.Log("sqlite", fmt.Sprintf("migrating %s", sqlitePath))
+// migrate runs our database migrations (defined at the top of this file)
+// over a sqlite database it creates first.
+// To configure where on disk the sqlite db is set SQLITE_DB_PATH.
+//
+// You use db like any other database/sql driver.
+//
+// https://github.com/mattn/go-sqlite3/blob/master/_example/simple/simple.go
+// https://astaxie.gitbooks.io/build-web-application-with-golang/en/05.3.html
+func migrate(logger log.Logger) (*sql.DB, error) {
+	path := getSqlitePath()
+	db, err := createConnection(path)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Log("sqlite", fmt.Sprintf("migrating %s", path))
 	for i := range migrations {
 		row := migrations[i]
 		res, err := db.Exec(row)
 		if err != nil {
-			return fmt.Errorf("migration #%d [%s...] had problem: %v", i, row[:40], err)
+			return nil, fmt.Errorf("migration #%d [%s...] had problem: %v", i, row[:40], err)
 		}
 		n, err := res.RowsAffected()
 		if err == nil {
@@ -98,5 +106,6 @@ func migrate() error {
 		}
 	}
 	logger.Log("sqlite", "finished migrations")
-	return nil
+
+	return db, nil
 }

@@ -73,7 +73,8 @@ func main() {
 	}()
 
 	// migrate database
-	if err := migrate(); err != nil {
+	db, err := migrate(logger)
+	if err != nil {
 		logger.Log("sqlite", err)
 		os.Exit(1)
 	}
@@ -84,20 +85,19 @@ func main() {
 		errs <- err
 	}
 
-	router := mux.NewRouter()
-
-	// api routes
-	addOAuthRoutes(router, oauth, logger)
-
 	// user services
 	authService := &auth{
+		db:  db,
 		log: logger,
 	}
 	userService := &sqliteUserRepository{
+		db:  db,
 		log: logger,
 	}
 
-	// user routes
+	// api routes
+	router := mux.NewRouter()
+	addOAuthRoutes(router, oauth, logger, authService)
 	addLoginRoutes(router, logger, authService, userService)
 	addLogoutRoutes(router, logger, authService)
 	addSignupRoutes(router, logger, authService, userService)

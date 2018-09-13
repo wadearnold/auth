@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -73,14 +74,14 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 }
 
 // addOAuthRoutes includes our oauth2 routes on the provided mux.Router
-func addOAuthRoutes(r *mux.Router, o *oauth, logger log.Logger) {
+func addOAuthRoutes(r *mux.Router, o *oauth, logger log.Logger, auth authable) {
 	r.Methods("GET").Path("/authorize").HandlerFunc(o.authorizeHandler)
 	if o.server.Config.AllowGetAccessRequest {
 		r.Methods("GET").Path("/token").HandlerFunc(o.tokenHandler)
 	} else {
 		r.Methods("POST").Path("/token").HandlerFunc(o.tokenHandler)
 	}
-	r.Methods("POST").Path("/token/recreate").HandlerFunc(o.recreateTokenHandler)
+	r.Methods("POST").Path("/token/recreate").HandlerFunc(o.recreateTokenHandler(auth))
 }
 
 // authorizeHandler checks the request for appropriate oauth information
@@ -126,40 +127,54 @@ func (o *oauth) tokenHandler(w http.ResponseWriter, r *http.Request) {
 //  - creates new tokens (and returns them only once)
 //
 // This method extracts the user from the cookies in r.
-func (o *oauth) recreateTokenHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO(adam): find user via cookies, grab their oauth2 tokens, upsert values
-	// TODO(adam): tokenGenerations.With("method", "oauth2_via_web").Add(1)
-
-	// Probably want to know o.clientStore is a buntdbclient.ClientStore, so
-	// then we can add methods on there we need.
-
-	userId := "" // TODO(adam)
-	records, err := o.clientStore.GetByUserID(userId)
-
-	if records == nil && err == nil { // nothing found
-		o.logger.Log("oauth", fmt.Sprintf("userId=%s had no oauth clients", userId))
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	for i := range records {
-		if err := o.clientStore.DeleteByID(records[i].GetID()); err != nil {
+func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userId, err := auth.findUserId(extractCookie(r).Value)
+		if err != nil {
 			internalError(w, err, "oauth")
 			return
 		}
 
-		// TODO(adam): render these back to user
-		records[i] = &models.Client{
-			ID: "", // TODO(adam)
-			Secret: "",
-			Domain: records[i].GetDomain(),
-			UserID: userId,
+		records, err := o.clientStore.GetByUserID(userId)
+		if records == nil && err == nil { // nothing found
+			o.logger.Log("oauth", fmt.Sprintf("userId=%s had no oauth clients", userId))
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 
-		if err := o.clientStore.Set(records[i].GetID(), records[i]); err != nil {
-			// TODO(adam): log
+		clients := make([]*models.Client, len(records))
+		for i := range records {
+			if err := o.clientStore.DeleteByID(records[i].GetID()); err != nil {
+				internalError(w, err, "oauth")
+				return
+			}
+
+			clients[i] = &models.Client{
+				ID:     generateID()[:12],
+				Secret: generateID(),
+				Domain: records[i].GetDomain(),
+				UserID: userId,
+			}
+
+			if err := o.clientStore.Set(records[i].GetID(), records[i]); err != nil {
+				internalError(w, err, "oauth")
+				return
+			}
 		}
+
+		// metrics
+		tokenGenerations.With("method", "oauth2_via_web").Add(1)
+
+		// render back new client info
+		type response struct {
+			clients []*models.Client `json:"clients"`
+		}
+		if err := json.NewEncoder(w).Encode(&response{clients: clients}); err != nil {
+			internalError(w, err, "oauth")
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (o *oauth) shutdown() error {

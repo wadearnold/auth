@@ -6,6 +6,7 @@ package main
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -83,6 +84,7 @@ type userRepository interface {
 }
 
 type sqliteUserRepository struct {
+	db  *sql.DB
 	log log.Logger
 }
 
@@ -105,9 +107,9 @@ func (s *sqliteUserRepository) upsert(inc *User) error {
 // authable represents the interactions of a user's authentication
 // status. This boils down to password comparison and cookie data.
 type authable interface {
-	checkCookies(userId string, incoming []string) error
+	findUserId(data string) (string, error)
 	invalidateCookies(userId string) error
-	writeCookies(userId string, incoming []string) error
+	writeCookie(userId string, incoming string) error
 
 	// checkPassword compares the provided password for the user.
 	// a non-nil error is returned if the passwords don't match
@@ -117,12 +119,31 @@ type authable interface {
 }
 
 type auth struct {
+	db  *sql.DB
 	log log.Logger
 }
 
-func (a *auth) checkCookies(userId string, cookies []string) error {
-	// user_cookies
-	return nil
+// findUserId takes cookie data and returns the userId associated
+func (a *auth) findUserId(data string) (string, error) {
+	query := `select user_id from user_cookies where data == ? and valid_until > ?`
+	stmt, err := a.db.Prepare(query)
+	if err != nil {
+		return "", err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(data)
+	if err != nil {
+		return "", err
+	}
+	var userId string
+	for rows.Next() {
+		rows.Scan(&userId)
+		if userId != "" {
+			return userId, nil
+		}
+	}
+	return "", nil
 }
 
 func (a *auth) invalidateCookies(userId string) error {
@@ -130,7 +151,7 @@ func (a *auth) invalidateCookies(userId string) error {
 	return nil
 }
 
-func (a *auth) writeCookies(userId string, incoming []string) error {
+func (a *auth) writeCookie(userId string, data string) error {
 	// user_cookies
 	return nil
 }
