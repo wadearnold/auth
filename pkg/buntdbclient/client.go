@@ -7,7 +7,7 @@
 //
 // A few extra operations have been added though, such as Set and
 // GetByUserId. These were needed for ourusecase as we're mutating
-// the oauth cleints.
+// the oauth clients.
 //
 // Tests can be ran with a database in the package dir, just add -debug
 // as a flag to 'go test'.
