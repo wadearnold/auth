@@ -22,6 +22,8 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
+const Version = "v0.1.0-dev"
+
 var (
 	httpAddr = flag.String("http.addr", ":8080", "HTTP listen address")
 
@@ -56,8 +58,6 @@ var (
 		Help: "Count of auth tokens created",
 	}, []string{"method"})
 )
-
-const Version = "0.1.0-dev"
 
 func main() {
 	flag.Parse()
