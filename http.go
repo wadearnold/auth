@@ -62,3 +62,16 @@ func extractCookie(r *http.Request) *http.Cookie {
 	}
 	return nil
 }
+
+// createCookie generates a new cookie and associates it with the provided
+// userId.
+func createCookie(userId string, auth authable) (*http.Cookie, error) {
+	data := generateID()
+	if err := auth.writeCookie(userId, data); err != nil {
+		return nil, err
+	}
+	return &http.Cookie{
+		Name:  cookieName,
+		Value: data,
+	}, nil
+}

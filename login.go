@@ -63,8 +63,15 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		} else {
 			authSuccesses.With("method", "web").Add(1)
 			w.WriteHeader(http.StatusOK)
-			// TODO(adam): return user json
-			// TODO(adam): set cookie
+			cookie, err := createCookie(u.ID, auth)
+			if err != nil {
+				internalError(w, err, "login")
+			}
+			http.SetCookie(w, cookie)
+			if err := json.NewEncoder(w).Encode(u); err != nil {
+				internalError(w, err, "login")
+				return
+			}
 		}
 	}
 }

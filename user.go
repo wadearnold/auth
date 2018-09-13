@@ -24,12 +24,13 @@ import (
 // TODO(adam): having a row in user_approval_codes means user isn't verified. Delete on email approval.
 
 type User struct {
-	ID                  string
-	Email               string
-	FirstName, LastName string
-	Phone               string
-	CompanyURL          string
-	CreatedAt           time.Time
+	ID         string    `json:"id"`
+	Email      string    `json:"email"`
+	FirstName  string    `json:"firstName"`
+	LastName   string    `json:"lastName"`
+	Phone      string    `json:"phone"`
+	CompanyURL string    `json:"companyUrl"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 var (
