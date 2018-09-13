@@ -45,7 +45,7 @@ var (
 const (
 	bcryptCostFactor = 20
 
-	// from 'go doc time Time.String'
+	// from 'go doc time Time.String', format used in sqlite columns
 	serializedTimestampFormat = "2006-01-02 15:04:05.999999999 -0700 MST"
 )
 

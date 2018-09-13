@@ -59,8 +59,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		// find user
 		u, err := userService.lookupByEmail(signup.Email)
 		if err != nil && !strings.Contains(err.Error(), "user not found") {
-			// TODO(adam): should we return the raw error back? info disclosure?
-			encodeError(w, err)
+			encodeError(w, errors.New("if this user exists, please try again with proper credentials"))
 			internalError(w, err, "signup")
 			return
 		}
@@ -103,23 +102,16 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 				CreatedAt:  time.Now(),
 			}
 			if err := userService.upsert(u); err != nil {
-				// TODO(adam): should we return the raw error back? info disclosure?
-				encodeError(w, err)
 				internalError(w, fmt.Errorf("problem writing user: %v", err), "signup")
 				return
 			}
 
 			if err := auth.writePassword(u.ID, signup.Password); err != nil {
-				encodeError(w, errors.New("problem writing user credentials"))
 				internalError(w, fmt.Errorf("problem writing user credentials: %v", err), "signup")
 				return
 			}
 
-			// TODO(adam): signup worked, so render back user and oauth client info
-			//
-			// On signup, we create an oauth2 (model.Token) with random client id/secret,
-			// domain (todo?), and UserID set to our value, write that (using o.clientStore).
-
+			// signup worked, yay!
 		} else {
 			// user found, so reject signup
 			encodeError(w, errors.New("user already exists"))
