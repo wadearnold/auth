@@ -5,12 +5,12 @@
 package buntdbclient
 
 import (
+	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"flag"
 
 	"gopkg.in/oauth2.v3/models"
 )
@@ -25,6 +25,7 @@ type testCS struct {
 	// temp dir used
 	dir string
 }
+
 func (cs *testCS) cleanup() error {
 	if cs == nil {
 		return nil
@@ -137,10 +138,10 @@ func TestClientStore__scan(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 	err = cs.Set(id+"2", &models.Client{
-		ID:     id+"2",
+		ID:     id + "2",
 		Secret: "secret",
 		Domain: "domain",
-		UserID: userId+"2",
+		UserID: userId + "2",
 	})
 	if err != nil {
 		t.Errorf("got %v", err)

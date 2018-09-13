@@ -123,7 +123,7 @@ func (cs *ClientStore) GetByUserID(userId string) ([]oauth2.ClientInfo, error) {
 	keys := make(map[string]bool, 0)
 
 	err := cs.db.View(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual("user_id", userId, func(k,v string) bool {
+		return tx.AscendEqual("user_id", userId, func(k, v string) bool {
 			if v == userId {
 				keys[k] = true
 			}
@@ -141,7 +141,7 @@ func (cs *ClientStore) GetByUserID(userId string) ([]oauth2.ClientInfo, error) {
 
 	// Grab each ClientInfo now
 	var accum []oauth2.ClientInfo
-	for k,_ := range keys {
+	for k, _ := range keys {
 		ci, _ := cs.GetByID(k)
 		if ci != nil {
 			accum = append(accum, ci)
