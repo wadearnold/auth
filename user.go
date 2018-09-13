@@ -20,10 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// purpose
-// - handle signup route POST /account
-// - dedup users based on "clean_email" (no special chars, i.e. . - + )
-// - validate email (by sending with approval_code) [probably diff file]
+// TODO(adam): validate email (by sending with approval_code) [probably diff file]
 
 // TODO(adam): having a row in user_approval_codes means user isn't verified. Delete on email approval.
 
