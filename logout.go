@@ -17,10 +17,12 @@ func addLogoutRoutes(router *mux.Router, logger log.Logger, auth authable) {
 
 func logoutRoute(auth authable) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// TODO(adam): get u.ID from request (cookie)
-		// TODO(adam): that extraction will be used in all other routes
-		id := "" // TODO
-		if err := auth.invalidateCookies(id); err != nil {
+		userId, err := auth.findUserId(extractCookie(r).Value)
+		if err != nil {
+			internalError(w, err, "logout")
+			return
+		}
+		if err := auth.invalidateCookies(userId); err != nil {
 			logger.Log("logout", err)
 		}
 		authInactivations.With("method", "web").Add(1)
