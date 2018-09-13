@@ -16,6 +16,8 @@ const (
 	// from a request body. It's intended to be used
 	// with an io.LimitReader
 	maxReadBytes = 1 * 1024 * 1024
+
+	cookieName = "moov-io--auth"
 )
 
 // read consumes an io.Reader (wrapping with io.LimitReader)
@@ -44,4 +46,19 @@ func internalError(w http.ResponseWriter, err error, component string) {
 	internalServerErrors.Add(1)
 	w.WriteHeader(http.StatusInternalServerError)
 	logger.Log(component, err)
+}
+
+// extractCookie attempts to pull out our cookie from the incoming request.
+// We use the contents to find the associated userId.
+func extractCookie(r *http.Request) *http.Cookie {
+	if r == nil {
+		return nil
+	}
+	cs := r.Cookies()
+	for i := range cs {
+		if cs[i].Name == cookieName {
+			return cs[i]
+		}
+	}
+	return nil
 }

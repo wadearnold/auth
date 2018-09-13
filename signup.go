@@ -115,7 +115,6 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 	}
 }
 
-
 // Notes
 //
 // On signup, we create an oauth2 (model.Token) with random client id/secret,
