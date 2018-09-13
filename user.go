@@ -6,14 +6,17 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // purpose
@@ -36,6 +39,13 @@ type User struct {
 var (
 	dropPlusExtender = regexp.MustCompile(`(\+.*)$`)
 	dropPeriods      = strings.NewReplacer(".", "")
+)
+
+const (
+	bcryptCostFactor = 10 // TODO(adam): value ok?
+
+	// from 'go doc time Time.String'
+	serializedTimestampFormat = "2006-01-02 15:04:05.999999999 -0700 MST"
 )
 
 func (u *User) cleanEmail() string {
@@ -110,7 +120,7 @@ func (s *sqliteUserRepository) upsert(inc *User) error {
 type authable interface {
 	findUserId(data string) (string, error)
 	invalidateCookies(userId string) error
-	writeCookie(userId string, incoming string) error
+	writeCookie(userId string, cookie *http.Cookie) error
 
 	// checkPassword compares the provided password for the user.
 	// a non-nil error is returned if the passwords don't match
@@ -126,6 +136,12 @@ type auth struct {
 
 // findUserId takes cookie data and returns the userId associated
 func (a *auth) findUserId(data string) (string, error) {
+	// the SHA256 checksum is stored, not the actual data.
+	data, err := hash(data)
+	if err != nil {
+		return "", err
+	}
+
 	query := `select user_id from user_cookies where data == ? and valid_until > ?`
 	stmt, err := a.db.Prepare(query)
 	if err != nil {
@@ -137,6 +153,7 @@ func (a *auth) findUserId(data string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer rows.Close()
 	var userId string
 	for rows.Next() {
 		rows.Scan(&userId)
@@ -148,21 +165,95 @@ func (a *auth) findUserId(data string) (string, error) {
 }
 
 func (a *auth) invalidateCookies(userId string) error {
-	// user_cookies
+	stmt, err := a.db.Prepare(`delete from user_cookies where user_id = ?`)
+	if err != nil {
+		return err
+	}
+	res, err := stmt.Exec(userId)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	a.log.Log("user", fmt.Sprintf("deleted %d cookies for userId=%s", n, userId))
 	return nil
 }
 
-func (a *auth) writeCookie(userId string, data string) error {
-	// user_cookies
+func (a *auth) writeCookie(userId string, cookie *http.Cookie) error {
+	stmt, err := a.db.Prepare(`insert into user_cookies values (?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	// hash the data
+	data, err := hash(cookie.Value)
+	if err != nil {
+		return err
+	}
+	validUntil := cookie.Expires.Format(serializedTimestampFormat)
+
+	// write row
+	stmt.Exec(userId, data, validUntil)
 	return nil
 }
 
-func (a *auth) checkPassword(userId string, pass string) error {
-	// user_passwords
-	return nil
+// fakeBcryptRounds just performs a bcrypt.GenerateFromPassword and then
+// a bcrypto.CompareHashAndPassword afterwords. In an attempt to make happy
+// and sad paths take "approximately" the same.
+func (a *auth) fakeBcryptRounds() {
+	id := generateID()
+	bcrypt.GenerateFromPassword([]byte(id), bcryptCostFactor)
+	bcrypt.CompareHashAndPassword([]byte(id), []byte(id))
+}
+
+func (a *auth) checkPassword(userId string, incoming string) error {
+	stmt, err := a.db.Prepare(`select password, salt from user_passwords where user_id = ?`)
+	if err != nil {
+		a.fakeBcryptRounds()
+		return err
+	}
+
+	row := stmt.QueryRow(userId)
+	var storedPassword, storedSalt string
+	if err := row.Scan(&storedPassword, storedSalt); err != nil {
+		a.fakeBcryptRounds()
+		return err
+	}
+
+	incomingPassword, err := bcrypt.GenerateFromPassword([]byte(incoming), bcryptCostFactor)
+	if err != nil {
+		a.fakeBcryptRounds()
+		return err // this path takes less time (no CompareHashAndPassword call)
+	}
+	return bcrypt.CompareHashAndPassword([]byte(storedPassword+storedSalt), incomingPassword)
 }
 
 func (a *auth) writePassword(userId string, pass string) error {
-	// user_passwords
+	salt := generateID()
+	incomingPassword, err := bcrypt.GenerateFromPassword([]byte(pass+salt), bcryptCostFactor)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := a.db.Prepare(`replace into user_passwords (user_id, password, salt) values (?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(userId, string(incomingPassword), salt)
+	if err != nil {
+		return err
+	}
+	a.log.Log("user", fmt.Sprintf("userId=%s updated password", userId))
 	return nil
+}
+
+func hash(in string) (string, error) {
+	ss := sha256.New()
+	n, err := ss.Write([]byte(in))
+	if err != nil {
+		return "", err
+	}
+	if n == 0 {
+		return "", err
+	}
+	return hex.EncodeToString(ss.Sum(nil)), nil
 }

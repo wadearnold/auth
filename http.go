@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 const (
@@ -18,6 +19,7 @@ const (
 	maxReadBytes = 1 * 1024 * 1024
 
 	cookieName = "moov-io--auth"
+	cookieTTL  = 30 * 24 * time.Hour // days * hours/day * hours
 )
 
 // read consumes an io.Reader (wrapping with io.LimitReader)
@@ -66,12 +68,15 @@ func extractCookie(r *http.Request) *http.Cookie {
 // createCookie generates a new cookie and associates it with the provided
 // userId.
 func createCookie(userId string, auth authable) (*http.Cookie, error) {
-	data := generateID()
-	if err := auth.writeCookie(userId, data); err != nil {
+	cookie := &http.Cookie{
+		Name:     cookieName,
+		Value:    generateID(),
+		Expires:  time.Now().Add(cookieTTL),
+		Secure:   true,
+		HttpOnly: true,
+	}
+	if err := auth.writeCookie(userId, cookie); err != nil {
 		return nil, err
 	}
-	return &http.Cookie{
-		Name:  cookieName,
-		Value: data,
-	}, nil
+	return cookie, nil
 }

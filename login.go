@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-kit/kit/log"
@@ -59,6 +60,7 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		// find user by userId and password
 		if err := auth.checkPassword(u.ID, login.Password); err != nil {
 			authFailures.With("method", "web").Add(1)
+			logger.Log("login", fmt.Sprintf("userId=%s failed: %v", u.ID, err))
 			w.WriteHeader(http.StatusForbidden)
 			return
 		} else {
