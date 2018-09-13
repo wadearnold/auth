@@ -15,7 +15,7 @@ func TestHTTP__extractCookie(t *testing.T) {
 		t.Error("nil req")
 	}
 	req.AddCookie(&http.Cookie{
-		Name:  "moov-io--auth",
+		Name:  "moov_auth",
 		Value: "data",
 	})
 
