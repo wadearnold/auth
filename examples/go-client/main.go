@@ -44,7 +44,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	client := conf.Client(context.TODO(), &token)
+	client := conf.Client(context.Background(), &token)
 
 	u = conf.Endpoint.AuthURL
 	resp, err = client.Get(u)

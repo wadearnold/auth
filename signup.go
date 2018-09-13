@@ -110,8 +110,6 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			encodeError(w, errors.New("user already exists"))
 			w.WriteHeader(http.StatusForbidden)
 		}
-
-		// TODO(adam): wipe all old cookies? (ones we got in request)
 	}
 }
 
