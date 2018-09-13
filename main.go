@@ -27,6 +27,10 @@ var (
 
 	logger log.Logger
 
+	// Configuration
+	tlsCertificate, tlsPrivateKey = os.Getenv("TLS_CERT"), os.Getenv("TLS_KEY")
+	serveViaTLS                   = tlsCertificate != "" && tlsPrivateKey != ""
+
 	// Metrics
 	// TODO(adam): be super fancy and generate README.md table in go:generate
 	authSuccesses = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
@@ -133,10 +137,13 @@ func main() {
 	}()
 
 	go func() {
-		logger.Log("transport", "HTTP", "addr", *httpAddr)
-		errs <- serve.ListenAndServe()
-		// TODO(adam): support TLS
-		// func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error
+		if serveViaTLS {
+			logger.Log("transport", "HTTPS", "addr", *httpAddr)
+			errs <- serve.ListenAndServeTLS(tlsCertificate, tlsPrivateKey)
+		} else {
+			logger.Log("transport", "HTTP", "addr", *httpAddr)
+			errs <- serve.ListenAndServe()
+		}
 	}()
 
 	if err := <-errs; err != nil {
