@@ -11,9 +11,14 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
+)
+
+const (
+	minPasswordLength = 8
 )
 
 type signupRequest struct {
@@ -64,6 +69,20 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			if err := json.Unmarshal(bs, &signup); err != nil {
 				encodeError(w, err)
 				logger.Log("signup", fmt.Sprintf("failed parsing request json: %v", err))
+				return
+			}
+
+			// Basic data sanity checks
+			if signup.Email == "" {
+				encodeError(w, errors.New("no email provided"))
+				return
+			}
+			if signup.Password == "" {
+				encodeError(w, errors.New("no password provided"))
+				return
+			}
+			if n := utf8.RuneCountInString(signup.Password); n < minPasswordLength {
+				encodeError(w, fmt.Errorf("password required to be at least %d characters", n))
 				return
 			}
 
