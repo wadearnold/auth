@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/moov-io/auth/pkg/buntdbclient"
 
@@ -66,8 +67,11 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 		return
 	})
 	out.server.SetResponseErrorHandler(func(re *errors.Response) {
-		logger.Log("response-error", re.Error.Error())
-		return
+		m := re.Error.Error()
+		if m == "server_error" || m == "unsupported_grant_type" {
+			return
+		}
+		logger.Log("response-error", m)
 	})
 
 	return out, nil
