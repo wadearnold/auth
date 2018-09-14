@@ -76,18 +76,30 @@ func main() {
 		errs <- fmt.Errorf("%s", <-c)
 	}()
 
+	go admin.Init()
+
 	// migrate database
 	db, err := migrate(logger)
 	if err != nil {
 		logger.Log("sqlite", err)
 		os.Exit(1)
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Log("sqlite", err)
+		}
+	}()
 
 	oauth, err := setupOauthServer(logger)
 	if err != nil {
 		logger.Log("oauth", err)
 		errs <- err
 	}
+	defer func() {
+		if err := oauth.shutdown(); err != nil {
+			logger.Log("oauth", err)
+		}
+	}()
 
 	// user services
 	authService := &auth{
@@ -127,8 +139,11 @@ func main() {
 			logger.Log("shutdown", err)
 		}
 	}
+	defer shutdownServer()
 
 	adminService := admin.SetupServer()
+	defer adminService.Shutdown()
+
 	go func() {
 		logger.Log("admin", fmt.Sprintf("Starting admin service on %s", adminService.BindAddress()))
 		if err := adminService.Listen(); err != nil {
@@ -139,22 +154,19 @@ func main() {
 	go func() {
 		if serveViaTLS {
 			logger.Log("transport", "HTTPS", "addr", *httpAddr)
-			errs <- serve.ListenAndServeTLS(tlsCertificate, tlsPrivateKey)
+			if err := serve.ListenAndServeTLS(tlsCertificate, tlsPrivateKey); err != nil {
+				logger.Log("main", err)
+			}
 		} else {
 			logger.Log("transport", "HTTP", "addr", *httpAddr)
-			errs <- serve.ListenAndServe()
+			if err := serve.ListenAndServe(); err != nil {
+				logger.Log("main", err)
+			}
 		}
 	}()
 
 	if err := <-errs; err != nil {
-		if db != nil {
-			if err := db.Close(); err != nil {
-				logger.Log("sqlite", err)
-			}
-		}
-		oauth.shutdown()
-		adminService.Shutdown()
-		shutdownServer()
 		logger.Log("exit", err)
 	}
+	os.Exit(0)
 }
