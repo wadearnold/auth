@@ -32,6 +32,7 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
 		bs, err := read(r.Body)
 		if err != nil {
 			internalError(w, err, "login")
@@ -42,7 +43,6 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		var login loginRequest
 		if err := json.Unmarshal(bs, &login); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			logger.Log("login", err)
 			return
 		}
 
@@ -74,16 +74,19 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 		}
 		if cookie == nil {
 			logger.Log("login", fmt.Sprintf("nil cookie for userId=%s", u.ID))
+			internalError(w, err, "login")
+			return
 		}
 		if err := auth.writeCookie(u.ID, cookie); err != nil {
 			internalError(w, err, "login")
 			return
 		}
+
+		http.SetCookie(w, cookie)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if err := json.NewEncoder(w).Encode(u); err != nil {
 			internalError(w, err, "login")
 			return
 		}
-		http.SetCookie(w, cookie)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	}
 }

@@ -37,8 +37,8 @@ func encodeError(w http.ResponseWriter, err error) {
 	if err == nil {
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusBadRequest)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"error": err.Error(),
 	})
@@ -46,8 +46,8 @@ func encodeError(w http.ResponseWriter, err error) {
 
 func internalError(w http.ResponseWriter, err error, component string) {
 	internalServerErrors.Add(1)
-	w.WriteHeader(http.StatusInternalServerError)
 	logger.Log(component, err)
+	w.WriteHeader(http.StatusInternalServerError)
 }
 
 // extractCookie attempts to pull out our cookie from the incoming request.

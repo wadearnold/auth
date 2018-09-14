@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/oauth2"
 )
@@ -26,8 +27,8 @@ func main() {
 	}
 
 	// We need to pass along more fields in the token request
-	u := "http://localhost:8080/token?grant_type=client_credentials&client_id=000000&client_secret=999999&scope=read"
-	resp, err := http.Get(u)
+	u, _ := url.Parse(fmt.Sprintf("http://localhost:8080/token?grant_type=client_credentials&client_id=%s&client_secret=%s&scope=read", conf.ClientID, conf.ClientSecret))
+	resp, err := http.Get(u.String())
 	if err != nil {
 		panic(err.Error())
 	}
@@ -46,8 +47,8 @@ func main() {
 
 	client := conf.Client(context.Background(), &token)
 
-	u = conf.Endpoint.AuthURL
-	resp, err = client.Get(u)
+	u, _ = url.Parse(conf.Endpoint.AuthURL)
+	resp, err = client.Get(u.String())
 	if err != nil {
 		panic(err.Error())
 	}

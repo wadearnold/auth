@@ -51,8 +51,8 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		// read request body
 		var signup signupRequest
 		if err := json.Unmarshal(bs, &signup); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
 			logger.Log("login", err)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
@@ -60,7 +60,6 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 		u, err := userService.lookupByEmail(signup.Email)
 		if err != nil && !strings.Contains(err.Error(), "user not found") {
 			encodeError(w, errors.New("if this user exists, please try again with proper credentials"))
-			internalError(w, err, "signup")
 			return
 		}
 		if u == nil {
@@ -88,8 +87,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			// store user
 			userId := generateID()
 			if userId == "" {
-				encodeError(w, err)
-				internalError(w, fmt.Errorf("blank userId generated, err=%v", err), "signup")
+				internalError(w, fmt.Errorf("problem creating userId, err=%v", err), "signup")
 				return
 			}
 			u = &User{

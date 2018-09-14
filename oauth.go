@@ -102,9 +102,9 @@ func (o *oauth) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Passed token check, return "200 OK"
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "text/plain")
 	authSuccesses.With("method", "oauth2").Add(1)
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
 }
 
 // tokenHandler passes off the request down to our oauth2 library to
@@ -131,20 +131,21 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userId, err := auth.findUserId(extractCookie(r).Value)
 		if err != nil {
-			internalError(w, err, "oauth")
+			// user not found, return
+			w.WriteHeader(http.StatusForbidden)
 			return
 		}
 
 		records, err := o.clientStore.GetByUserID(userId)
-		if records == nil && err == nil { // nothing found
-			o.logger.Log("oauth", fmt.Sprintf("userId=%s had no oauth clients", userId))
-			w.WriteHeader(http.StatusOK)
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			internalError(w, err, "oauth")
 			return
 		}
 
 		clients := make([]*models.Client, len(records))
 		for i := range records {
-			if err := o.clientStore.DeleteByID(records[i].GetID()); err != nil {
+			err = o.clientStore.DeleteByID(records[i].GetID())
+			if err != nil && !strings.Contains(err.Error(), "not found") {
 				internalError(w, err, "oauth")
 				return
 			}
@@ -169,11 +170,11 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 		type response struct {
 			Clients []*models.Client `json:"clients"`
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if err := json.NewEncoder(w).Encode(&response{clients}); err != nil {
 			internalError(w, err, "oauth")
+			return
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	}
 }
 

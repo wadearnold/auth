@@ -24,6 +24,8 @@ func logoutRoute(auth authable) func(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := auth.invalidateCookies(userId); err != nil {
 			logger.Log("logout", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		authInactivations.With("method", "web").Add(1)
 		w.WriteHeader(http.StatusOK)
