@@ -13,11 +13,11 @@ import (
 // pprofHandlers is a map which holds configuration for
 // serving various pprof handlers on the admin servlet.
 //
-// We only wnat to expose on the admin servlet because these
+// We only want to expose on the admin servlet because these
 // profiles/dumps can contain sensitive info (i.e. password hash, email)
 // or alter the app performance.
 //
-// These values can be overridden by setting the appropiate PPROF_*
+// These values can be overridden by setting the appropriate PPROF_*
 // environment variable.
 //
 // TODO(adam): generate readme.md env vars from this
