@@ -17,6 +17,5 @@ func Init() error {
 	if pprofProfileEnabled("mutex", true) {
 		runtime.SetMutexProfileFraction(1)
 	}
-
 	return nil
 }

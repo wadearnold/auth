@@ -37,7 +37,7 @@ var pprofHandlers = map[string]bool{
 //  PPROF_$name where $name is uppercase
 //
 // A string of "yes" returns true, and "no" returns false, otherwise
-// zero is returned.
+// zero is returned. Empty strings return zero.
 func pprofProfileEnabled(name string, zero bool) bool {
 	v := os.Getenv(fmt.Sprintf("PPROF_%s", strings.ToUpper(name)))
 	switch strings.ToLower(v) {
