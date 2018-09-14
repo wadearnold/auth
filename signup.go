@@ -110,6 +110,7 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			}
 
 			// signup worked, yay!
+			// TODO(adam): email approval link and clickthrough
 		} else {
 			// user found, so reject signup
 			encodeError(w, errors.New("user already exists"))

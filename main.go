@@ -117,6 +117,7 @@ func main() {
 	addLoginRoutes(router, logger, authService, userService)
 	addLogoutRoutes(router, logger, authService)
 	addSignupRoutes(router, logger, authService, userService)
+	// TODO(adam): profile CRU[D] routes
 
 	readTimeout, _ := time.ParseDuration("30s")
 	writTimeout, _ := time.ParseDuration("30s")
