@@ -17,7 +17,12 @@ func addLogoutRoutes(router *mux.Router, logger log.Logger, auth authable) {
 
 func logoutRoute(auth authable) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userId, err := auth.findUserId(extractCookie(r).Value)
+		cookie := extractCookie(r)
+		if cookie == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		userId, err := auth.findUserId(cookie.Value)
 		if err != nil {
 			internalError(w, err, "logout")
 			return
