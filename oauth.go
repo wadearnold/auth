@@ -79,9 +79,10 @@ func addOAuthRoutes(r *mux.Router, o *oauth, logger log.Logger, auth authable) {
 	if o.server.Config.AllowGetAccessRequest {
 		r.Methods("GET").Path("/token").HandlerFunc(o.tokenHandler)
 	} else {
+		// some oauth implementations need POST
 		r.Methods("POST").Path("/token").HandlerFunc(o.tokenHandler)
 	}
-	r.Methods("POST").Path("/token/recreate").HandlerFunc(o.recreateTokenHandler(auth))
+	r.Methods("POST").Path("/token/create").HandlerFunc(o.recreateTokenHandler(auth))
 }
 
 // authorizeHandler checks the request for appropriate oauth information

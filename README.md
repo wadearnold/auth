@@ -22,7 +22,7 @@ The follow are environment variables which
 - GET    /authorize
 - GET    /token
 - POST   /token
-- POST   /token/recreate
+- POST   /token/create
 - POST   /users/create
 - POST   /users/login
 
