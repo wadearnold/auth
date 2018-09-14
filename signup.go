@@ -71,16 +71,12 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			}
 
 			// Basic data sanity checks
-			if signup.Email == "" {
-				encodeError(w, errors.New("no email provided"))
+			if err := checkEmail(signup.Email); err != nil {
+				encodeError(w, err)
 				return
 			}
-			if signup.Password == "" {
-				encodeError(w, errors.New("no password provided"))
-				return
-			}
-			if n := utf8.RuneCountInString(signup.Password); n < minPasswordLength {
-				encodeError(w, fmt.Errorf("password required to be at least %d characters", n))
+			if err := checkPassword(signup.Password); err != nil {
+				encodeError(w, err)
 				return
 			}
 
@@ -116,4 +112,21 @@ func signupRoute(auth authable, userService userRepository) func(w http.Response
 			encodeError(w, errors.New("user already exists"))
 		}
 	}
+}
+
+func checkEmail(email string) error {
+	if email == "" || !strings.Contains(email, "@") {
+		return errors.New("no email provided")
+	}
+	return nil
+}
+
+func checkPassword(pass string) error {
+	if pass == "" {
+		return errors.New("no password provided")
+	}
+	if n := utf8.RuneCountInString(pass); n < minPasswordLength {
+		return fmt.Errorf("password required to be at least %d characters", n)
+	}
+	return nil
 }
