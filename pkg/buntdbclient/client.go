@@ -16,16 +16,10 @@ package buntdbclient
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/tidwall/buntdb"
 	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/models"
-)
-
-var (
-	// DefaultTTL is the value used as TTL on buntdb.SetOptions
-	DefaultTTL time.Duration = 24 * time.Hour
 )
 
 // New initializes a new BuntDB database with any indicies needed
@@ -95,10 +89,7 @@ func (cs *ClientStore) Set(id string, cli oauth2.ClientInfo) error {
 	}
 
 	err := cs.db.Update(func(tx *buntdb.Tx) error {
-		opts := &buntdb.SetOptions{
-			Expires: DefaultTTL > 0,
-			TTL:     DefaultTTL,
-		}
+		opts := &buntdb.SetOptions{}
 		_, _, err := tx.Set(fmt.Sprintf("%s-secret", id), cli.GetSecret(), opts)
 		if err != nil {
 			return err
@@ -135,7 +126,6 @@ func (cs *ClientStore) GetByUserID(userId string) ([]oauth2.ClientInfo, error) {
 		})
 	})
 	if err != nil {
-		fmt.Println("A")
 		return nil, err
 	}
 
