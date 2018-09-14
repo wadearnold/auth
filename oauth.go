@@ -142,6 +142,9 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 			internalError(w, err, "oauth")
 			return
 		}
+		if records == nil || len(records) == 0 { // nothing found, so fake one
+			records = append(records, &models.Client{})
+		}
 
 		clients := make([]*models.Client, len(records))
 		for i := range records {
@@ -158,7 +161,7 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 				UserID: userId,
 			}
 
-			if err := o.clientStore.Set(records[i].GetID(), records[i]); err != nil {
+			if err := o.clientStore.Set(clients[i].GetID(), clients[i]); err != nil {
 				internalError(w, err, "oauth")
 				return
 			}
