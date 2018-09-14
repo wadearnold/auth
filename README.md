@@ -12,6 +12,7 @@ The follow are environment variables which
 
 - `OAUTH2_DB_PATH`: TODO
 - `SQLITE_DB_PATH`: TODO
+- `DOMAIN`
 
 - `TLS_CERT` and `TLS_KEY` TODO
 

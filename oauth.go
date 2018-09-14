@@ -153,7 +153,7 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 			clients[i] = &models.Client{
 				ID:     generateID()[:12],
 				Secret: generateID(),
-				Domain: records[i].GetDomain(),
+				Domain: Domain,
 				UserID: userId,
 			}
 

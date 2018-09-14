@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -21,6 +22,20 @@ const (
 	cookieName = "moov_auth"
 	cookieTTL  = 30 * 24 * time.Hour // days * hours/day * hours
 )
+
+var (
+	// Domain is the domain to publish cookies under.
+	// If empty "localhost" is used.
+	//
+	// The path is always set to /.
+	Domain string = os.Getenv("DOMAIN")
+)
+
+func init() {
+	if Domain == "" {
+		Domain = "localhost"
+	}
+}
 
 // read consumes an io.Reader (wrapping with io.LimitReader)
 // and returns either the resulting bytes or a non-nil error.
@@ -69,11 +84,13 @@ func extractCookie(r *http.Request) *http.Cookie {
 // userId.
 func createCookie(userId string, auth authable) (*http.Cookie, error) {
 	cookie := &http.Cookie{
-		Name:     cookieName,
-		Value:    generateID(),
+		Domain:   Domain,
 		Expires:  time.Now().Add(cookieTTL),
-		Secure:   serveViaTLS,
 		HttpOnly: true,
+		Name:     cookieName,
+		Path:     "/",
+		Secure:   serveViaTLS,
+		Value:    generateID(),
 	}
 	if err := auth.writeCookie(userId, cookie); err != nil {
 		return nil, err
