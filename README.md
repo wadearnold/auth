@@ -1,6 +1,6 @@
 ## auth
 
-This is moov.io's api auth service.
+This repository holds the authentication service for [moov.io](https://github.com/moov-io). If you find a problem (security or otherwise), please contact us at [`security@moov.io`](mailto:security@moov.io).
 
 ### runbook
 
