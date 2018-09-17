@@ -18,7 +18,31 @@ type loginRequest struct {
 }
 
 func addLoginRoutes(router *mux.Router, logger log.Logger, auth authable, userService userRepository) {
+	router.Methods("GET").Path("/users/login").HandlerFunc(checkLogin(logger, auth, userService))
 	router.Methods("POST").Path("/users/login").HandlerFunc(loginRoute(logger, auth, userService))
+}
+
+func checkLogin(logger log.Logger, auth authable, userService userRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+
+		cookie := extractCookie(r)
+		if cookie == nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		userId, err := auth.findUserId(cookie.Value)
+		if err != nil {
+			internalError(w, err, "login")
+			return
+		}
+		if userId == "" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 }
 
 func loginRoute(logger log.Logger, auth authable, userService userRepository) http.HandlerFunc {
