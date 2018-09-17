@@ -5,16 +5,11 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
-)
-
-var (
-	errUserNotFound = errors.New("user not found")
 )
 
 type loginRequest struct {
@@ -53,7 +48,7 @@ func loginRoute(logger log.Logger, auth authable, userService userRepository) ht
 			// the user is involved at this point. Otherwise it's their
 			// developer's problem (i.e. bad json).
 			authFailures.With("method", "web").Add(1)
-			encodeError(w, errUserNotFound)
+			w.WriteHeader(http.StatusForbidden)
 			return
 		}
 
