@@ -38,19 +38,24 @@ var (
 	}, []string{"state"})
 )
 
-type promMetricCollector struct{}
+type promMetricCollector struct {
+	tick *time.Ticker
+}
 
-func (promMetricCollector) run(db *sql.DB) {
+func (p *promMetricCollector) run(db *sql.DB) {
 	if db == nil {
 		return
 	}
+	p.tick = time.NewTicker(1 * time.Second)
 
 	for {
-		stats := db.Stats()
-		connections.With("state", "idle").Set(float64(stats.Idle))
-		connections.With("state", "inuse").Set(float64(stats.InUse))
-		connections.With("state", "open").Set(float64(stats.OpenConnections))
-		time.Sleep(time.Second)
+		select {
+		case <-p.tick.C:
+			stats := db.Stats()
+			connections.With("state", "idle").Set(float64(stats.Idle))
+			connections.With("state", "inuse").Set(float64(stats.InUse))
+			connections.With("state", "open").Set(float64(stats.OpenConnections))
+		}
 	}
 }
 
@@ -72,7 +77,7 @@ func createConnection(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	prom := promMetricCollector{}
+	prom := &promMetricCollector{}
 	go prom.run(db) // TODO(adam): not anon goroutine
 
 	return db, nil
