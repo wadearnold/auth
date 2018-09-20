@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -18,15 +19,23 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/metrics/prometheus"
+	"github.com/gorilla/mux"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
+
+const Version = "v0.1.1-dev"
 
 var (
 	httpAddr = flag.String("http.addr", ":8080", "HTTP listen address")
 
 	logger log.Logger
 
+	// Configuration
+	tlsCertificate, tlsPrivateKey = os.Getenv("TLS_CERT"), os.Getenv("TLS_KEY")
+	serveViaTLS                   = tlsCertificate != "" && tlsPrivateKey != ""
+
 	// Metrics
+	// TODO(adam): be super fancy and generate README.md table in go:generate
 	authSuccesses = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 		Name: "auth_successes",
 		Help: "Count of successful authorizations",
@@ -35,14 +44,21 @@ var (
 		Name: "auth_failures",
 		Help: "Count of failed authorizations",
 	}, []string{"method"})
+	authInactivations = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Name: "auth_inactivations",
+		Help: "Count of inactivated auths (i.e. user logout)",
+	}, []string{"method"})
+
+	internalServerErrors = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Name: "http_errors",
+		Help: "Count of how many 5xx errors we send out",
+	}, nil)
 
 	tokenGenerations = prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 		Name: "auth_token_generations",
 		Help: "Count of auth tokens created",
 	}, []string{"method"})
 )
-
-const Version = "0.1.0-dev"
 
 func main() {
 	flag.Parse()
@@ -56,16 +72,53 @@ func main() {
 	// Listen for application termination.
 	errs := make(chan error)
 	go func() {
-		c := make(chan os.Signal)
+		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 		errs <- fmt.Errorf("%s", <-c)
 	}()
 
+	go admin.Init()
+
+	// migrate database
+	db, err := migrate(logger)
+	if err != nil {
+		logger.Log("sqlite", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Log("sqlite", err)
+		}
+	}()
+
 	oauth, err := setupOauthServer(logger)
 	if err != nil {
-		panic(err.Error()) // TODO(adam)
+		logger.Log("oauth", err)
+		errs <- err
 	}
-	handler := oauthHandler(oauth, logger)
+	defer func() {
+		if err := oauth.shutdown(); err != nil {
+			logger.Log("oauth", err)
+		}
+	}()
+
+	// user services
+	authService := &auth{
+		db:  db,
+		log: logger,
+	}
+	userService := &sqliteUserRepository{
+		db:  db,
+		log: logger,
+	}
+
+	// api routes
+	router := mux.NewRouter()
+	addOAuthRoutes(router, oauth, logger, authService)
+	addLoginRoutes(router, logger, authService, userService)
+	addLogoutRoutes(router, logger, authService)
+	addSignupRoutes(router, logger, authService, userService)
+	// TODO(adam): profile CRU[D] routes
 
 	readTimeout, _ := time.ParseDuration("30s")
 	writTimeout, _ := time.ParseDuration("30s")
@@ -73,7 +126,7 @@ func main() {
 
 	serve := &http.Server{
 		Addr:    *httpAddr,
-		Handler: handler,
+		Handler: router,
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify:       false,
 			PreferServerCipherSuites: true,
@@ -84,12 +137,15 @@ func main() {
 		IdleTimeout:  idleTimeout,
 	}
 	shutdownServer := func() {
-		if err := serve.Shutdown(nil); err != nil {
+		if err := serve.Shutdown(context.TODO()); err != nil {
 			logger.Log("shutdown", err)
 		}
 	}
+	defer shutdownServer()
 
 	adminService := admin.SetupServer()
+	defer adminService.Shutdown()
+
 	go func() {
 		logger.Log("admin", fmt.Sprintf("Starting admin service on %s", adminService.BindAddress()))
 		if err := adminService.Listen(); err != nil {
@@ -98,15 +154,21 @@ func main() {
 	}()
 
 	go func() {
-		logger.Log("transport", "HTTP", "addr", *httpAddr)
-		errs <- serve.ListenAndServe()
-		// TODO(adam): support TLS
-		// func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error
+		if serveViaTLS {
+			logger.Log("transport", "HTTPS", "addr", *httpAddr)
+			if err := serve.ListenAndServeTLS(tlsCertificate, tlsPrivateKey); err != nil {
+				logger.Log("main", err)
+			}
+		} else {
+			logger.Log("transport", "HTTP", "addr", *httpAddr)
+			if err := serve.ListenAndServe(); err != nil {
+				logger.Log("main", err)
+			}
+		}
 	}()
 
 	if err := <-errs; err != nil {
-		adminService.Shutdown()
-		shutdownServer()
 		logger.Log("exit", err)
 	}
+	os.Exit(0)
 }

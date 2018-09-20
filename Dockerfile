@@ -1,11 +1,12 @@
-FROM golang:1.11-alpine as builder
+FROM golang:1.11-stretch as builder
 WORKDIR /go/src/github.com/moov-io/auth
-RUN apk -U add make
+RUN apt-get update && apt-get install make gcc g++
 COPY . .
 RUN make build
 
-FROM scratch
+FROM debian:9
+RUN apt-get update && apt-get install -y ca-certificates
 COPY --from=builder /go/src/github.com/moov-io/auth/bin/auth /bin/auth
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 EXPOSE 8080
-ENTRYPOINT ["/bin/server"]
+VOLUME "/data"
+ENTRYPOINT ["/bin/auth"]

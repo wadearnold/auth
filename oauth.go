@@ -5,10 +5,13 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
+
+	"github.com/moov-io/auth/pkg/buntdbclient"
 
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
@@ -21,7 +24,7 @@ import (
 
 type oauth struct {
 	manager     *manage.Manager
-	clientStore *store.ClientStore
+	clientStore *buntdbclient.ClientStore
 	server      *server.Server
 
 	logger log.Logger
@@ -33,7 +36,11 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	}
 
 	// oauth2 setup
-	tokenStore, err := store.NewMemoryTokenStore()
+	path := os.Getenv("OAUTH2_TOKENS_DB_PATH")
+	if path == "" {
+		path = "oauth2_tokens.db"
+	}
+	tokenStore, err := store.NewFileTokenStore(path)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating token store: %v", err)
 	}
@@ -41,13 +48,15 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 	out.manager = manage.NewDefaultManager()
 	out.manager.MapTokenStorage(tokenStore)
 
-	out.clientStore = store.NewClientStore()
-	out.clientStore.Set("000000", &models.Client{
-		ID:     "000000", // TODO(adam): yea, yea..
-		Secret: "999999",
-		Domain: "http://localhost",
-		// TODO(adam): limit scopes
-	})
+	path = os.Getenv("OAUTH2_CLIENTS_DB_PATH")
+	if path == "" {
+		path = "oauth2_clients.db"
+	}
+	cs, err := buntdbclient.New(path)
+	if err != nil {
+		return nil, fmt.Errorf("problem creating clients store: %v", err)
+	}
+	out.clientStore = cs
 	out.manager.MapClientStorage(out.clientStore)
 
 	out.server = server.NewDefaultServer(out.manager)
@@ -58,24 +67,26 @@ func setupOauthServer(logger log.Logger) (*oauth, error) {
 		return
 	})
 	out.server.SetResponseErrorHandler(func(re *errors.Response) {
-		logger.Log("response-error", re.Error.Error())
-		return
+		m := re.Error.Error()
+		if m == "server_error" || m == "unsupported_grant_type" {
+			return
+		}
+		logger.Log("response-error", m)
 	})
 
 	return out, nil
 }
 
-func oauthHandler(o *oauth, logger log.Logger) http.Handler {
-	r := mux.NewRouter()
+// addOAuthRoutes includes our oauth2 routes on the provided mux.Router
+func addOAuthRoutes(r *mux.Router, o *oauth, logger log.Logger, auth authable) {
 	r.Methods("GET").Path("/authorize").HandlerFunc(o.authorizeHandler)
-
 	if o.server.Config.AllowGetAccessRequest {
 		r.Methods("GET").Path("/token").HandlerFunc(o.tokenHandler)
 	} else {
+		// some oauth implementations need POST
 		r.Methods("POST").Path("/token").HandlerFunc(o.tokenHandler)
 	}
-
-	return r
+	r.Methods("POST").Path("/token/create").HandlerFunc(o.recreateTokenHandler(auth))
 }
 
 // authorizeHandler checks the request for appropriate oauth information
@@ -86,19 +97,19 @@ func (o *oauth) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	ti, err := o.server.ValidationBearerToken(r)
 	if err != nil {
 		authFailures.With("method", "oauth2").Add(1)
-		encodeError(nil, err, w)
+		encodeError(w, err)
 		return
 	}
 	if ti.GetClientID() == "" {
 		authFailures.With("method", "oauth2").Add(1)
-		encodeError(nil, fmt.Errorf("missing client_id"), w)
+		encodeError(w, fmt.Errorf("missing client_id"))
 		return
 	}
 
 	// Passed token check, return "200 OK"
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "text/plain")
 	authSuccesses.With("method", "oauth2").Add(1)
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
 }
 
 // tokenHandler passes off the request down to our oauth2 library to
@@ -106,20 +117,78 @@ func (o *oauth) authorizeHandler(w http.ResponseWriter, r *http.Request) {
 func (o *oauth) tokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := o.server.HandleTokenRequest(w, r)
 	if err != nil {
-		encodeError(nil, err, w)
+		encodeError(w, err)
 		return
 	}
-	tokenGenerations.With("method", "oauth2").Add(1)
+	// TODO(adam): We need to track this metric inside our TokenStorage.
+	// HandleTokenRequest currently returns nil even if the token request
+	// failed. There's no real way to inspect the http.ResponseWriter in
+	// an attempt to correctly calculate this.
+	// tokenGenerations.With("method", "oauth2").Add(1)
 }
 
-// encodeError JSON encodes the supplied error
-func encodeError(_ context.Context, err error, w http.ResponseWriter) {
-	if err == nil {
-		return
+// recreateTokenHandler will recreate the oauth token for a user. This involves:
+//  - invalidate all existing tokens
+//  - creates new tokens (and returns them only once)
+//
+// This method extracts the user from the cookies in r.
+func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userId, err := auth.findUserId(extractCookie(r).Value)
+		if err != nil {
+			// user not found, return
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		records, err := o.clientStore.GetByUserID(userId)
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			internalError(w, err, "oauth")
+			return
+		}
+		if len(records) == 0 { // nothing found, so fake one
+			records = append(records, &models.Client{})
+		}
+
+		clients := make([]*models.Client, len(records))
+		for i := range records {
+			err = o.clientStore.DeleteByID(records[i].GetID())
+			if err != nil && !strings.Contains(err.Error(), "not found") {
+				internalError(w, err, "oauth")
+				return
+			}
+
+			clients[i] = &models.Client{
+				ID:     generateID()[:12],
+				Secret: generateID(),
+				Domain: Domain,
+				UserID: userId,
+			}
+
+			if err := o.clientStore.Set(clients[i].GetID(), clients[i]); err != nil {
+				internalError(w, err, "oauth")
+				return
+			}
+		}
+
+		// metrics
+		tokenGenerations.With("method", "oauth2_via_web").Add(1)
+
+		// render back new client info
+		type response struct {
+			Clients []*models.Client `json:"clients"`
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if err := json.NewEncoder(w).Encode(&response{clients}); err != nil {
+			internalError(w, err, "oauth")
+			return
+		}
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error": err.Error(),
-	})
+}
+
+func (o *oauth) shutdown() error {
+	if o == nil || o.clientStore == nil {
+		return nil
+	}
+	return o.clientStore.Close()
 }

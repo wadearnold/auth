@@ -1,7 +1,14 @@
+// Copyright 2018 The ACH Authors
+// Use of this source code is governed by an Apache License
+// license that can be found in the LICENSE file.
+
 package admin
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -33,16 +40,33 @@ func (s *Server) BindAddress() string {
 
 // Start brings up the admin HTTP service. This call blocks.
 func (s *Server) Listen() error {
+	if s == nil || s.svc == nil {
+		return nil
+	}
 	return s.svc.ListenAndServe()
 }
 
 // Shutdown unbinds the HTTP server.
 func (s *Server) Shutdown() {
-	s.svc.Shutdown(nil)
+	if s == nil || s.svc == nil {
+		return
+	}
+	s.svc.Shutdown(context.TODO())
 }
 
 func handler() http.Handler {
 	r := mux.NewRouter()
+
+	// prometheus metrics
 	r.Methods("GET").Path("/metrics").Handler(promhttp.Handler())
+
+	// add all pprof handlers we've configured
+	r.HandleFunc("/debug/pprof/", pprof.Index)
+	for k, add := range pprofHandlers {
+		if pprofProfileEnabled(k, add) {
+			r.Handle(fmt.Sprintf("/debug/pprof/%s", k), pprof.Handler(k))
+		}
+	}
+
 	return r
 }
