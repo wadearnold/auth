@@ -16,5 +16,6 @@ release: docker
 	git tag $(VERSION)
 
 release-push:
+	echo "$DOCKER_PASSWORD" | docker login -u wadearnold --password-stdin 
 	git push origin $(VERSION)
 	docker push moov/auth:$(VERSION)
