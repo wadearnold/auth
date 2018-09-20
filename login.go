@@ -41,7 +41,6 @@ func checkLogin(logger log.Logger, auth authable, userService userRepository) ht
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		return
 	}
 }
 

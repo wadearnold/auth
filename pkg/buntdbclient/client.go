@@ -30,8 +30,12 @@ func New(path string) (*ClientStore, error) {
 		return nil, err
 	}
 
-	// Migrations
-	db.CreateIndex("user_id", "*", buntdb.IndexJSON("UserID")) // ScanByUserId
+	err = db.Update(func(tx *buntdb.Tx) error {
+		return tx.CreateIndex("user_id", "*", buntdb.IndexJSON("UserID")) // ScanByUserId
+	})
+	if err != nil {
+		return nil, fmt.Errorf("problem running migrations: %v", err)
+	}
 
 	return &ClientStore{
 		db: db,
@@ -111,7 +115,7 @@ func (cs *ClientStore) Set(id string, cli oauth2.ClientInfo) error {
 // userId.
 // If return values are nil that means no matching records were found.
 func (cs *ClientStore) GetByUserID(userId string) ([]oauth2.ClientInfo, error) {
-	keys := make(map[string]bool, 0)
+	keys := make(map[string]bool)
 
 	err := cs.db.View(func(tx *buntdb.Tx) error {
 		return tx.AscendEqual("user_id", userId, func(k, v string) bool {

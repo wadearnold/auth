@@ -50,7 +50,7 @@ func (promMetricCollector) run(db *sql.DB) {
 		connections.With("state", "idle").Set(float64(stats.Idle))
 		connections.With("state", "inuse").Set(float64(stats.InUse))
 		connections.With("state", "open").Set(float64(stats.OpenConnections))
-		time.Sleep(1)
+		time.Sleep(time.Second)
 	}
 }
 

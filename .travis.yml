@@ -12,6 +12,7 @@ before_install:
 - go get -u github.com/client9/misspell/cmd/misspell
 - go get -u golang.org/x/lint/golint
 - go get github.com/fzipp/gocyclo
+- go get -u honnef.co/go/tools/cmd/megacheck
 # deploys help
 - go get github.com/mitchellh/gox
 - go get github.com/tcnksm/ghr
@@ -23,6 +24,7 @@ script:
 - misspell -error -locale US $GOFILES
 - gocyclo -over 19 $GOFILES
 - golint -set_exit_status $GOFILES
+- megacheck ./...
 after_success:
   - make docker
 deploy:

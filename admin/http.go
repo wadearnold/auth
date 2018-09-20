@@ -5,6 +5,7 @@
 package admin
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -50,7 +51,7 @@ func (s *Server) Shutdown() {
 	if s == nil || s.svc == nil {
 		return
 	}
-	s.svc.Shutdown(nil)
+	s.svc.Shutdown(context.TODO())
 }
 
 func handler() http.Handler {

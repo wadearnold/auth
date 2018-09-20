@@ -176,7 +176,7 @@ func TestClientStore__delete(t *testing.T) {
 	id := "moov"
 
 	// get nothing
-	cli, err := cs.GetByID(id)
+	_, err = cs.GetByID(id)
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("got %#v", err)
 	}
@@ -190,7 +190,7 @@ func TestClientStore__delete(t *testing.T) {
 	})
 
 	// get something
-	cli, err = cs.GetByID(id)
+	cli, err := cs.GetByID(id)
 	if err != nil || cli == nil {
 		t.Errorf("got cli=%v, err=%#v", cli, err)
 	}
@@ -199,7 +199,7 @@ func TestClientStore__delete(t *testing.T) {
 	cs.DeleteByID(id)
 
 	// get nothing :-(
-	cli, err = cs.GetByID(id)
+	_, err = cs.GetByID(id)
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("got %#v", err)
 	}

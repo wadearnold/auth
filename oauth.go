@@ -146,7 +146,7 @@ func (o *oauth) recreateTokenHandler(auth authable) http.HandlerFunc {
 			internalError(w, err, "oauth")
 			return
 		}
-		if records == nil || len(records) == 0 { // nothing found, so fake one
+		if len(records) == 0 { // nothing found, so fake one
 			records = append(records, &models.Client{})
 		}
 
